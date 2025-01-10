@@ -226,7 +226,7 @@
       </div>
     </div>
     <label class="flexrow accdiff-footer accdiff-weight lancer-border-primary" for="accdiff-other-sources">
-      Other Sources
+      Other Sources, Dawg
     </label>
     <div id="accdiff-other-sources" class="accdiff-grid">
       <div class="accdiff-other-grid lancer-border-primary" style="border-right-width: 1px;border-right-style: dashed;">
