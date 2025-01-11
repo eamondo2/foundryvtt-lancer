@@ -79,6 +79,7 @@ export class AccDiffHudWeapon {
 }
 
 export class AccDiffHudBase {
+  skillBonusInjected: string;
   flatBonusInjected: number;
   accuracy: number;
   difficulty: number;
@@ -90,6 +91,7 @@ export class AccDiffHudBase {
 
   static get schema() {
     return {
+      skillBonusInjected: t.string,
       flatBonusInjected: t.number,
       accuracy: t.number,
       difficulty: t.number,
@@ -105,6 +107,7 @@ export class AccDiffHudBase {
   }
 
   constructor(obj: t.TypeOf<typeof AccDiffHudBase.schemaCodec>) {
+    this.skillBonusInjected = obj.skillBonusInjected;
     this.flatBonusInjected = obj.flatBonusInjected;
     this.accuracy = obj.accuracy;
     this.difficulty = obj.difficulty;
@@ -114,6 +117,7 @@ export class AccDiffHudBase {
 
   get raw() {
     return {
+      skillBonusInjected: this.skillBonusInjected,
       flatBonusInjected: this.flatBonusInjected,
       accuracy: this.accuracy,
       difficulty: this.difficulty,
@@ -369,6 +373,7 @@ export class AccDiffHudData {
     }
 
     let base = {
+      skillBonusInjected: "0_test",
       flatBonusInjected: 0,
       cover: Cover.None,
       accuracy: starting[0],

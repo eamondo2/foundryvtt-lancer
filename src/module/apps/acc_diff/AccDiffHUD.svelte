@@ -40,6 +40,12 @@
   $: profile = lancerItem ? findProfile() : null;
   $: ranges = lancerItem ? findRanges() : null;
 
+  let placeHolderSkillSelection = {
+    skillName: "None",
+    skillBonus: 0,
+  };
+  base.skillBonusInjected = `${placeHolderSkillSelection.skillBonus}_${placeHolderSkillSelection.skillName}`;
+
   const dispatch = createEventDispatcher();
   let submitted = false;
 
@@ -55,7 +61,6 @@
     if (lancerActor?.is_mech()) {
       let pilotActor = lancerActor.system.pilot;
       if (pilotActor?.status === "resolved") {
-        console.log(pilotActor.value.items);
         let skillList = pilotActor.value.items
           .filter(x => {
             return is_skill(x);
@@ -66,6 +71,8 @@
               skillBonus: x.system.curr_rank * 2,
             };
           });
+        console.log(skillList);
+
         return skillList;
       }
     }
@@ -269,9 +276,14 @@
         <PlusMinusInput bind:value={base.flatBonusInjected} id="accdiff-flat-mod" />
       </div>
       <div class="accdiff-other-grid lancer-border-primary" style="border-right-width: 1px;border-right-style: dashed;">
-        <select bind:value={base.flatBonusInjected}>
-          {#each populateSkillList() as item}
-            <option value={item.skillBonus}>{item.skillName}</option>
+        <select bind:value={base.skillBonusInjected}>
+          <option value="{placeHolderSkillSelection.skillBonus}_{placeHolderSkillSelection.skillName}" selected
+            >{placeHolderSkillSelection.skillName} +{placeHolderSkillSelection.skillBonus}</option
+          >
+          {#each populateSkillList() as item, i}
+            <option selected={i === 0} value="{item.skillBonus}_{item.skillName}"
+              >{item.skillName} +{item.skillBonus}</option
+            >
           {/each}
         </select>
       </div>

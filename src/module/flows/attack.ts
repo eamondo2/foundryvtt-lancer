@@ -392,6 +392,7 @@ export async function showAttackHUD(
   try {
     state.data.acc_diff = await openSlidingHud("attack", state.data.acc_diff!);
     state.data.flat_bonus += state.data.acc_diff.base.flatBonusInjected;
+    state.data.flat_bonus += Number.parseInt(state.data.acc_diff.base.skillBonusInjected.split("_")[0]);
   } catch (_e) {
     // User hit cancel, abort the flow.
     return false;
