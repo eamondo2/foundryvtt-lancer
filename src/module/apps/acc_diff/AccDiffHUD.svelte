@@ -15,11 +15,11 @@
   import MiniProfile from "../components/MiniProfile.svelte";
   import { fade } from "../slidinghud";
 
-  import type { LancerItem } from "../../item/lancer-item";
-  import { NpcFeatureType, RangeType } from "../../enums";
+  import type { LancerItem, LancerSKILL } from "../../item/lancer-item";
+  import { EntryType, NpcFeatureType, RangeType } from "../../enums";
   import { WeaponRangeTemplate } from "../../pixi/weapon-range-template";
   import { targetsFromTemplate } from "../../flows/_template";
-  import type { LancerActor } from "../../actor/lancer-actor";
+  import type { LancerActor, LancerMECH, LancerPILOT } from "../../actor/lancer-actor";
   import HudCheckbox from "../components/HudCheckbox.svelte";
   import { LancerToken } from "../../token";
 
@@ -45,6 +45,31 @@
 
   function focus(el: HTMLElement) {
     el.focus();
+  }
+
+  function is_skill(skill: LancerItem): skill is LancerSKILL {
+    return skill.type === EntryType.SKILL;
+  }
+
+  function populateSkillList() {
+    if (lancerActor?.is_mech()) {
+      let pilotActor = lancerActor.system.pilot;
+      if (pilotActor?.status === "resolved") {
+        console.log(pilotActor.value.items);
+        let skillList = pilotActor.value.items
+          .filter(x => {
+            return is_skill(x);
+          })
+          .map(x => {
+            return {
+              skillName: x.name,
+              skillBonus: x.system.curr_rank * 2,
+            };
+          });
+        return skillList;
+      }
+    }
+    return [];
   }
 
   function targetHoverIn(event: MouseEvent, target: LancerToken) {
@@ -236,12 +261,19 @@
         <PlusMinusInput bind:value={base.difficulty} id="accdiff-other-diff" />
       </div>
     </div>
-    <label class="flexrow accdiff-footer accdiff-weight lancer-border-primary" for="accdiff-flat-bonus">
-      Flat Bonus
+    <label class="flexrow accdiff-footer accdiff-weight lancer-border-primary" for="accdiff-bonuses">
+      Flat Bonus and Skill Bonus WAHOO
     </label>
-    <div id="accdiff-flat-bonus" class="accdiff-grid">
+    <div id="accdiff-bonuses" class="accdiff-grid">
       <div class="accdiff-other-grid lancer-border-primary" style="border-right-width: 1px;border-right-style: dashed;">
         <PlusMinusInput bind:value={base.flatBonusInjected} id="accdiff-flat-mod" />
+      </div>
+      <div class="accdiff-other-grid lancer-border-primary" style="border-right-width: 1px;border-right-style: dashed;">
+        <select bind:value={base.flatBonusInjected}>
+          {#each populateSkillList() as item}
+            <option value={item.skillBonus}>{item.skillName}</option>
+          {/each}
+        </select>
       </div>
     </div>
     <div class="flex-col accdiff-footer lancer-border-primary">
