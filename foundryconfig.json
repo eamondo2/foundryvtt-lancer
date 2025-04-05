@@ -1,5 +1,5 @@
 {
-  "dataPath": "/path/to/foundry/data",
+  "dataPath": "/home/eamondo2/build/foundryvtt-lancer-tinkering/fvtt-copy/foundryvtt-data",
   "systemName": "lancer",
   "repository": "https://github.com/Eranziel/foundryvtt-lancer",
   "rawURL": "https://github.com/Eranziel/foundryvtt-lancer/releases/latest/download",
