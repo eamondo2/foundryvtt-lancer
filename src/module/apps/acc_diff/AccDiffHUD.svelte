@@ -44,7 +44,7 @@
     skillName: "None",
     skillBonus: 0,
   };
-  base.skillBonusInjected = `${placeHolderSkillSelection.skillBonus}_${placeHolderSkillSelection.skillName}`;
+  base.skillBonus = `${placeHolderSkillSelection.skillBonus}_${placeHolderSkillSelection.skillName}`;
 
   const dispatch = createEventDispatcher();
   let submitted = false;
@@ -322,7 +322,7 @@
           class="accdiff-other-grid lancer-border-primary"
           style="border-right-width: 1px;border-right-style: dashed;"
         >
-          <select bind:value={base.skillBonusInjected}>
+          <select bind:value={base.skillBonus}>
             <option value="{placeHolderSkillSelection.skillBonus}_{placeHolderSkillSelection.skillName}" selected
               >{placeHolderSkillSelection.skillName} +{placeHolderSkillSelection.skillBonus}</option
             >
