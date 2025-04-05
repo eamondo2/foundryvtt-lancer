@@ -1,8 +1,8 @@
 import { LANCER } from "./config";
 const lp = LANCER.log_prefix;
-import { LCPIndex } from "./apps/lcp-manager";
+import { LCPIndex } from "./apps/lcp-manager/lcp-manager";
 import { get_pack, get_pack_id } from "./util/doc";
-import type { LancerActor } from "./actor/lancer-actor";
+import type { LancerActor, LancerNPC } from "./actor/lancer-actor";
 import { LancerItem } from "./item/lancer-item";
 import { EntryType } from "./enums";
 import {
@@ -48,7 +48,6 @@ export async function clearAll(v1 = false): Promise<void> {
 
     const keys = Array.from(pack.index.keys());
     await pack.documentClass.deleteDocuments(keys, { pack: pack.collection });
-    // @ts-expect-error Pack folders is V11
     await Folder.deleteDocuments(Array.from(pack.folders.keys()), { pack: pack.collection });
   }
   await setAllLock(true, v1);
@@ -97,8 +96,7 @@ export async function importCP(
       let docs = await pack.getDocuments();
       // Get their ids
       docs.forEach(d => {
-        // @ts-expect-error Should be fixed with v10 types
-        existingLids.set((d as LancerActor | LancerItem).system.lid || d.name, d);
+        existingLids.set((d as LancerActor | LancerItem).system.lid || d.name, d as LancerActor | LancerItem);
       });
     }
 
@@ -163,13 +161,10 @@ export async function importCP(
       let pack = await get_pack(et);
       let folder: Folder | undefined = [EntryType.NPC, EntryType.STATUS].includes(et)
         ? undefined
-        : // @ts-expect-error Pack folders came with V11
-          pack.folders.find(f => f.getFlag(game.system.id, "entrytype") === et) ??
+        : pack.folders.find(f => f.getFlag(game.system.id, "entrytype") === et) ??
           (await Folder.create(
             {
-              // @ts-expect-error Pack folders came with V11
               name: game.i18n.localize(`TYPES.${pack.metadata.type}.${et}`),
-              // @ts-expect-error Pack folders came with V11
               type: pack.metadata.type,
               [`flags.${game.system.id}.entrytype`]: et,
             },
@@ -217,15 +212,21 @@ export async function importCP(
     await createOrUpdateDocs(CONFIG.Actor.documentClass, context.createdDeployables, EntryType.DEPLOYABLE);
 
     // NPC actor generation needs to wait until here so that the features are properly populated in the compendium
-    let npcActors = await createOrUpdateDocs(CONFIG.Actor.documentClass, allNpcs, EntryType.NPC);
-    let npcPromises = [];
+    const npcActors: LancerNPC[] = await createOrUpdateDocs(CONFIG.Actor.documentClass, allNpcs, EntryType.NPC);
+    const npcPromises = [];
     // Create each NPC and add its class item
     for (let npc of npcActors) {
+      // Remove existing class
+      const existingClass = npc.items.find(i => i.type === EntryType.NPC_CLASS);
+      if (existingClass) {
+        await npc.removeClassFeatures(existingClass);
+        await npc.deleteEmbeddedDocuments("Item", [existingClass.id!]);
+      }
+      // Find the class and add it to the NPC
       let classLid = allNpcClasses.find(n => n.name === npc.name)?.system.lid;
       if (!classLid) continue;
       let thisClass = (await fromLid(classLid, { source: "compendium" })) as LancerItem;
       if (thisClass) {
-        console.log(`Adding ${npc.name} class to NPC: `, npc);
         await npc.quickOwn(thisClass);
         npcPromises.push(...npc.npcClassSwapPromises);
       }
@@ -267,7 +268,7 @@ export async function setAllLock(lock = false, v1 = false) {
     : new Set(Object.values(EntryType).map(get_pack_id));
   for (let p of pack_ids) {
     let pack = game.packs.get(p);
-    await pack?.configure({ private: false, locked: lock });
+    await pack?.configure({ locked: lock });
   }
 }
 
@@ -283,4 +284,14 @@ export async function clearCompendiumData(options = { v1: false }) {
   await game.settings.set(game.system.id, LANCER.setting_lcps, new LCPIndex(null));
   await clearAll(options.v1);
   ui.notifications!.info(`LANCER Compendiums cleared.`);
+}
+
+declare global {
+  interface FlagConfig {
+    Folder: {
+      lancer: {
+        entrytype: EntryType;
+      };
+    };
+  }
 }

@@ -1,11 +1,11 @@
 import { LANCER, TypeIcon } from "../config";
 import { SystemData, SystemDataType, SystemTemplates } from "../system-template";
 import { SourceDataType } from "../source-template";
-import { DamageType, EntryType, NpcFeatureType, RangeType, WeaponType } from "../enums";
+import { DamageType, EntryType, EntryTypeLidPrefix, NpcFeatureType, RangeType, WeaponType } from "../enums";
 import { ActionData } from "../models/bits/action";
 import { RangeData, Range } from "../models/bits/range";
 import { Tag } from "../models/bits/tag";
-import { LancerActiveEffect, LancerActiveEffectConstructorData } from "../effects/lancer-active-effect";
+import { LancerActiveEffect } from "../effects/lancer-active-effect";
 import {
   bonusAffectsWeapon,
   convertBonus,
@@ -23,10 +23,11 @@ import { fixupPowerUses } from "../models/bits/power";
 import { BondPowerFlow } from "../flows/bond";
 import { ActivationFlow } from "../flows/activation";
 import { CoreActiveFlow } from "../flows/frame";
-import { SimpleTextFlow } from "../flows/text";
 import { StatRollFlow } from "../flows/stat";
 import { SystemFlow } from "../flows/system";
 import { DamageRollFlow } from "../flows/damage";
+import { randomString } from "../util/lid";
+import { generateItemID } from "../util/lcps";
 
 const lp = LANCER.log_prefix;
 
@@ -222,6 +223,7 @@ export class LancerItem extends Item {
   prepareBaseData() {
     super.prepareBaseData();
     // Some modules create items with type "base", or potentially others we don't care about
+    //@ts-expect-error V12 typing in progress
     if (!ITEM_TYPES.includes(this.type)) return;
 
     // Collect all tags on mech weapons
@@ -363,7 +365,7 @@ export class LancerItem extends Item {
     if ((this as any).destroyed === true || !this.isEquipped()) return [];
 
     // Generate from bonuses + innate effects
-    let effects: LancerActiveEffectConstructorData[] = [];
+    let effects = [];
     let bonus_groups: {
       // Converted & added to effects later
       group?: string;
@@ -414,24 +416,23 @@ export class LancerItem extends Item {
 
     // Convert bonuses
     effects.push(
-      ...(bonus_groups
-        .flatMap(bg =>
-          bg.bonuses.map(b => convertBonus(this.uuid, bg.group ? `${this.name} - ${bg.group}` : this.name!, b))
-        )
-        .filter(b => b) as LancerActiveEffectConstructorData[])
+      ...bonus_groups
+        .flatMap(bg => bg.bonuses.map(b => convertBonus(this, bg.group ? `${this.name} - ${bg.group}` : this.name!, b)))
+        .filter(b => b)
     );
 
-    return effects.map(e => new LancerActiveEffect(e, { parent: this }));
+    return effects.map(e => new LancerActiveEffect(e as object, { parent: this }));
   }
 
   /** @inheritdoc */
-  static async _onDeleteDocuments() {
+  static async _onDeleteOperation() {
     // Default implementation of this will delete active effects associated with this object.
     // We do that ourselves using effectManager, so to prevent fighting we disable this here
   }
 
-  protected async _preCreate(...[data, options, user]: Parameters<Item["_preCreate"]>): Promise<void> {
-    await super._preCreate(data, options, user);
+  protected async _preCreate(...[data, options, user]: Parameters<Item["_preCreate"]>): Promise<boolean | void> {
+    const allowed = await super._preCreate(data, options, user);
+    if (allowed === false) return false;
 
     // Select default image
     let icon_lookup: string = this.type;
@@ -444,18 +445,20 @@ export class LancerItem extends Item {
     // @ts-expect-error Should be fixed with v10 types
     if (data.system?.lid) {
       console.log(`${lp} New ${this.type} has data provided from an import, skipping default init.`);
-      if (!data.img || data.img == "icons/svg/item-bag.svg") {
-        // @ts-expect-error Should be fixed with v10 types
+      if (!data?.img || data.img == "icons/svg/item-bag.svg") {
         this.updateSource({ img });
       }
       return;
     }
 
     console.log(`${lp} Initializing new ${this.type}`);
-    // @ts-expect-error Should be fixed with v10 types
+    const name = this.name ?? `New ${this.type}`;
     this.updateSource({
       img: img,
-      name: this.name ?? `New ${this.type}`,
+      name,
+      system: {
+        lid: `${generateItemID(EntryTypeLidPrefix(this.type as EntryType), name)}-${randomString(8)}`,
+      },
     });
   }
 
@@ -699,7 +702,7 @@ export class LancerItem extends Item {
   async beginActivationFlow(path?: string) {
     if (!path) {
       // If no path is provided, default to the first action
-      // @ts-ignore We know it doesn't exist on all types, that's why we're checking
+      // @ts-expect-error We know it doesn't exist on all types, that's why we're checking
       if (!this.system.actions || this.system.actions.length < 1) {
         ui.notifications!.error(`Item ${this.id} has no actions, how did you even get here?`);
         return;

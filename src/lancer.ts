@@ -11,31 +11,31 @@
 import "./lancer.scss";
 
 // Import TypeScript modules
-import { LANCER, WELCOME } from "./module/config";
-import { migrateLancerConditions } from "./module/status-icons";
 import { LancerActor } from "./module/actor/lancer-actor";
+import { LANCER, WELCOME } from "./module/config";
 import { LancerItem } from "./module/item/lancer-item";
+import { migrateLancerConditions } from "./module/status-icons";
 import { populatePilotCache } from "./module/util/compcon";
 
 import { LancerActionManager } from "./module/action/action-manager";
 
 // Import applications
-import { LancerPilotSheet, pilotCounters, allMechPreview } from "./module/actor/pilot-sheet";
-import { LancerNPCSheet } from "./module/actor/npc-sheet";
 import { LancerDeployableSheet } from "./module/actor/deployable-sheet";
 import { LancerMechSheet } from "./module/actor/mech-sheet";
-import { LancerItemSheet } from "./module/item/item-sheet";
+import { LancerNPCSheet } from "./module/actor/npc-sheet";
+import { LancerPilotSheet } from "./module/actor/pilot-sheet";
 import { LancerFrameSheet } from "./module/item/frame-sheet";
+import { LancerItemSheet } from "./module/item/item-sheet";
 import { LancerLicenseSheet } from "./module/item/license-sheet";
-import { WeaponRangeTemplate } from "./module/pixi/weapon-range-template";
+import { WeaponRangeTemplate } from "./module/canvas/weapon-range-template";
 
 // Import helpers
+import { LCPManager, addLCPManagerButton } from "./module/apps/lcp-manager/lcp-manager";
+import { attachTagTooltips } from "./module/helpers/tags";
 import { preloadTemplates } from "./module/preload-templates";
 import { getAutomationOptions, registerSettings } from "./module/settings";
 import { applyTheme } from "./module/themes";
-import { attachTagTooltips, compactTagListHBS, itemEditTags } from "./module/helpers/tags";
 import * as migrations from "./module/world_migration";
-import { addLCPManager, updateCore, core_update } from "./module/apps/lcp-manager";
 
 // Import sliding HUD (used for accuracy/difficulty windows)
 import * as slidingHUD from "./module/apps/slidinghud";
@@ -47,62 +47,61 @@ tippy.setDefaultProps({ theme: "lancer-small", arrow: false, delay: [400, 200] }
 // tippy.setDefaultProps({ theme: "lancer", arrow: false, delay: [400, 200], hideOnClick: false, trigger: "click"});
 
 // Import node modules
-import { registerHandlebarsHelpers } from "./module/helpers";
-import { handleRefClickOpen } from "./module/helpers/refs";
-import { applyCollapseListeners, initializeCollapses } from "./module/helpers/collapse";
-import { handleCombatUpdate } from "./module/helpers/automation/combat";
-import { handleActorExport, validForExport } from "./module/helpers/io";
-import { targetsFromTemplate } from "./module/flows/_template";
-import { extendTokenConfig, LancerToken, LancerTokenDocument } from "./module/token";
-import { applyGlobalDragListeners } from "./module/helpers/dragdrop";
-import { gridDist } from "./module/helpers/automation/targeting";
-import CompconLoginForm from "./module/helpers/compcon-login-form";
+// import { importCC } from "./module/actor/import";
 import { LancerCombat, LancerCombatant } from "./module/combat/lancer-combat";
 import { LancerCombatTracker } from "./module/combat/lancer-combat-tracker";
-import { LancerCombatTrackerConfig } from "./module/helpers/lancer-initiative-config-form";
-import { MechModel } from "./module/models/actors/mech";
-import { MechSystemModel } from "./module/models/items/mech_system";
-import { handleRenderCombatCarousel } from "./module/helpers/combat-carousel";
-import { measureDistances } from "./module/grid";
-import { EntryType } from "./module/enums";
-import { FrameModel } from "./module/models/items/frame";
-import { PilotModel } from "./module/models/actors/pilot";
 import { LancerActiveEffect } from "./module/effects/lancer-active-effect";
-import { MechWeaponModel } from "./module/models/items/mech_weapon";
-import { CoreBonusModel } from "./module/models/items/core_bonus";
-import { NpcModel } from "./module/models/actors/npc";
+import { EntryType } from "./module/enums";
+import { targetsFromTemplate } from "./module/flows/_template";
+import { registerHandlebarsHelpers } from "./module/helpers";
+import { handleCombatUpdate } from "./module/helpers/automation/combat";
+import { gridDist } from "./module/helpers/automation/targeting";
+import { applyCollapseListeners, initializeCollapses } from "./module/helpers/collapse";
+import CompconLoginForm from "./module/helpers/compcon-login-form";
+import { applyGlobalDragListeners } from "./module/helpers/dragdrop";
+// import { handleActorExport, validForExport } from "./module/helpers/io";
+import { extendCombatTrackerConfig, onCloseCombatTrackerConfig } from "./module/apps/lancer-initiative-config-form";
+import { handleRefClickOpen } from "./module/helpers/refs";
 import { DeployableModel } from "./module/models/actors/deployable";
-import { TalentModel } from "./module/models/items/talent";
-import { fulfillImportActor } from "./module/util/requests";
-import { lookupOwnedDeployables } from "./module/util/lid";
+import { MechModel } from "./module/models/actors/mech";
+import { NpcModel } from "./module/models/actors/npc";
+import { PilotModel } from "./module/models/actors/pilot";
+import { CoreBonusModel } from "./module/models/items/core_bonus";
+import { FrameModel } from "./module/models/items/frame";
+import { MechSystemModel } from "./module/models/items/mech_system";
+import { MechWeaponModel } from "./module/models/items/mech_weapon";
 import { PilotArmorModel } from "./module/models/items/pilot_armor";
 import { PilotGearModel } from "./module/models/items/pilot_gear";
 import { PilotWeaponModel } from "./module/models/items/pilot_weapon";
-import { importCC } from "./module/actor/import";
+import { TalentModel } from "./module/models/items/talent";
+import { LancerToken, LancerTokenDocument, extendTokenConfig } from "./module/token";
+import { lookupOwnedDeployables } from "./module/util/lid";
+import { fulfillImportActor } from "./module/util/requests";
 
-import { addEnrichers } from "./module/helpers/text-enrichers";
+import { dropStatusToCanvas } from "./module/canvas/drop-status";
+import { beginCascadeFlow } from "./module/flows/cascade";
+import { applyDamage, rollDamageCallback, undoDamage } from "./module/flows/damage";
+import { Flow } from "./module/flows/flow";
+import { onHotbarDrop } from "./module/flows/hotbar";
+import { beginItemChatFlow } from "./module/flows/item";
+import { registerFlows } from "./module/flows/register-flows";
+import { beginSecondaryStructureFlow, triggerStrussFlow } from "./module/flows/structure";
 import { fromLid, fromLidMany, fromLidSync } from "./module/helpers/from-lid";
-import { SkillModel } from "./module/models/items/skill";
+import { addEnrichers } from "./module/helpers/text-enrichers";
+import { LancerNPCClassSheet } from "./module/item/npc-class-sheet";
+import { LancerNPCFeatureSheet } from "./module/item/npc-feature-sheet";
+import { BondModel } from "./module/models/items/bond";
 import { LicenseModel } from "./module/models/items/license";
-import { NpcTemplateModel } from "./module/models/items/npc_template";
 import { NpcClassModel } from "./module/models/items/npc_class";
 import { NpcFeatureModel } from "./module/models/items/npc_feature";
-import { LancerNPCClassSheet } from "./module/item/npc-class-sheet";
-import { WeaponModModel } from "./module/models/items/weapon_mod";
-import { ReserveModel } from "./module/models/items/reserve";
+import { NpcTemplateModel } from "./module/models/items/npc_template";
 import { OrganizationModel } from "./module/models/items/organization";
+import { ReserveModel } from "./module/models/items/reserve";
+import { SkillModel } from "./module/models/items/skill";
 import { StatusModel } from "./module/models/items/status";
-import { BondModel } from "./module/models/items/bond";
-import { Flow } from "./module/flows/flow";
-import { beginSecondaryStructureFlow, triggerStrussFlow } from "./module/flows/structure";
-import { beginCascadeFlow } from "./module/flows/cascade";
-import { get_pack_id } from "./module/util/doc";
+import { WeaponModModel } from "./module/models/items/weapon_mod";
 import { registerTours } from "./module/tours/register-tours";
-import { beginItemChatFlow } from "./module/flows/item";
-import { onHotbarDrop } from "./module/flows/hotbar";
-import { registerFlows } from "./module/flows/register-flows";
-import { LancerNPCFeatureSheet } from "./module/item/npc-feature-sheet";
-import { applyDamage, rollDamageCallback, undoDamage } from "./module/flows/damage";
+import { get_pack_id } from "./module/util/doc";
 import { tokenScrollText } from "./module/util/misc";
 
 const lp = LANCER.log_prefix;
@@ -111,58 +110,35 @@ const lp = LANCER.log_prefix;
 /* Initialize system                    */
 /* ------------------------------------ */
 addEnrichers();
-Hooks.once("init", async function () {
+Hooks.once("init", () => {
   console.log(`Initializing LANCER RPG System ${LANCER.ASCII}`);
 
-  // @ts-expect-error Use the v11+ active effect logic - effects never transfer from an item. Critical to how we handle effects
   CONFIG.ActiveEffect.legacyTransferral = false;
 
   // Add this schema for each document type.
   // game.documentTypes.Item.forEach(type => CONFIG.Item.dataModels[type] = MyItemModel);
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.PILOT_ARMOR] = PilotArmorModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.PILOT_GEAR] = PilotGearModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.PILOT_WEAPON] = PilotWeaponModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.CORE_BONUS] = CoreBonusModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.FRAME] = FrameModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.LICENSE] = LicenseModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.MECH_WEAPON] = MechWeaponModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.MECH_SYSTEM] = MechSystemModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.WEAPON_MOD] = WeaponModModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.RESERVE] = ReserveModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.ORGANIZATION] = OrganizationModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.SKILL] = SkillModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.STATUS] = StatusModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.TALENT] = TalentModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.BOND] = BondModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.NPC_CLASS] = NpcClassModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.NPC_TEMPLATE] = NpcTemplateModel;
-  // @ts-expect-error
   CONFIG.Item.dataModels[EntryType.NPC_FEATURE] = NpcFeatureModel;
 
-  // @ts-expect-error
   CONFIG.Actor.dataModels[EntryType.MECH] = MechModel;
-  // @ts-expect-error
   CONFIG.Actor.dataModels[EntryType.PILOT] = PilotModel;
-  // @ts-expect-error
   CONFIG.Actor.dataModels[EntryType.NPC] = NpcModel;
-  // @ts-expect-error
   CONFIG.Actor.dataModels[EntryType.DEPLOYABLE] = DeployableModel;
 
   // Set up trackable resources for the various actor types
@@ -186,21 +162,25 @@ Hooks.once("init", async function () {
       "tech_attack",
     ],
   };
-  // @ts-expect-error
   CONFIG.Actor.trackableAttributes = {
+    // @ts-expect-error
     base,
+    // @ts-expect-error
     ["deployable"]: {
       bar: [...base.bar],
       value: [...base.value, "cost", "instances"],
     },
+    // @ts-expect-error
     ["mech"]: {
       bar: [...base.bar, "structure", "stress", "repairs"],
       value: [...base.value, "action_tracker.move", "core_energy", "grit", "meltdown_timer", "overcharge"],
     },
+    // @ts-expect-error
     ["npc"]: {
       bar: [...base.bar, "structure", "stress"],
       value: [...base.value, "meltdown_timer", "tier"],
     },
+    // @ts-expect-error
     ["pilot"]: {
       bar: [...base.bar, "bond_state.stress", "bond_state.xp"],
       value: [...base.value, "grit", "level"],
@@ -208,9 +188,7 @@ Hooks.once("init", async function () {
   };
 
   // Configure indexes
-  // @ts-expect-error
-  CONFIG.Item.compendiumIndexFields = ["system.lid", "system.license"];
-  // @ts-expect-error
+  CONFIG.Item.compendiumIndexFields = ["system.lid", "system.license", "system.key"]; // key is for licenses
   CONFIG.Actor.compendiumIndexFields = ["system.lid"];
 
   // Register custom system settings
@@ -257,7 +235,15 @@ Hooks.once("init", async function () {
     importActor: fulfillImportActor,
     targetsFromTemplate,
     migrations: migrations,
-    getAutomationOptions: getAutomationOptions,
+    getAutomationOptions: () => {
+      ui.notifications.warn(
+        "The getAutomationOptions helper is deprecated and will be removed i" +
+          'n Foundry v13. Use game.settings.get("lancer", "automationOptions' +
+          '") directly instead.',
+        { permanent: true }
+      );
+      return getAutomationOptions();
+    },
     fromLid: fromLid,
     fromLidMany: fromLidMany,
     fromLidSync: fromLidSync,
@@ -271,6 +257,7 @@ Hooks.once("init", async function () {
   CONFIG.Token.objectClass = LancerToken;
   CONFIG.Combat.documentClass = LancerCombat;
   CONFIG.Combatant.documentClass = LancerCombatant;
+  // @ts-expect-error This is literally a subclass so idk why it's busted
   CONFIG.ui.combat = LancerCombatTracker;
 
   // Set up default system status icons
@@ -291,19 +278,37 @@ Hooks.once("init", async function () {
   Hooks.on("renderHeadsUpDisplay", slidingHUD.attach);
 
   // Combat tracker HUD modules integration
-  Hooks.on("renderCombatCarousel", handleRenderCombatCarousel);
-  if (game.modules.get("combat-tracker-dock")?.active) {
-    game.lancer.combatTrackerDock = await import("./module/integrations/combat-tracker-dock");
-    Hooks.on("renderCombatDock", (...[_app, html]: Parameters<Hooks.RenderApplication>) => {
-      html.find(".buttons-container [data-action='roll-all']").hide();
-      html.find(".buttons-container [data-action='roll-npc']").hide();
-      // html.find(".buttons-container [data-action='previous-turn']").hide();
-      html.find(".buttons-container [data-action='next-turn']").hide();
-    });
+  if (game.modules.get("combat-carousel")?.active) {
+    (async () => {
+      const { handleRenderCombatCarousel } = await import("./module/integrations/combat-carousel");
+      Hooks.on("renderCombatCarousel", handleRenderCombatCarousel);
+    })();
+  }
+  if (game.modules!.get("combat-tracker-dock")?.active) {
+    (async () => {
+      game.lancer.combatTrackerDock = await import("./module/integrations/combat-tracker-dock");
+      Hooks.on("renderCombatDock", (...[_app, html]: Parameters<Hooks.RenderApplication>) => {
+        html.find(".buttons-container [data-action='roll-all']").hide();
+        html.find(".buttons-container [data-action='roll-npc']").hide();
+        // html.find(".buttons-container [data-action='previous-turn']").hide();
+        html.find(".buttons-container [data-action='next-turn']").hide();
+      });
+    })();
   }
 
   // Extend TokenConfig for token size automation
   Hooks.on("renderTokenConfig", extendTokenConfig);
+});
+
+Hooks.once("setup", () => {
+  /////////////////////////////////
+  // DIRTY HACK DO NOT REPLICATE //
+  /////////////////////////////////
+  // Change the default value of the grid based templates option
+  // TODO Remove when we get https://github.com/foundryvtt/foundryvtt/issues/11477
+  if (game.settings.settings.get("core.gridTemplates"))
+    // @ts-expect-error This is hacky, but valid
+    game.settings.settings.get("core.gridTemplates")!.default = true;
 });
 
 /* ------------------------------------ */
@@ -323,8 +328,6 @@ Hooks.once("ready", async function () {
 
   await doMigration();
 
-  await showChangelog();
-
   applyGlobalDragListeners();
 
   game.action_manager = new LancerActionManager();
@@ -332,36 +335,33 @@ Hooks.once("ready", async function () {
 
   // Set up status icons from compendium and world items
   await LancerActiveEffect.populateFromItems();
-  // TODO: V12 Should automatically localize these, so this can get removed then
-  //@ts-expect-error v11 types
-  CONFIG.statusEffects.forEach(e => (e.name = game.i18n.localize(e.name)));
 
   Hooks.on("updateCompendium", async collection => {
     if (collection?.metadata?.id == get_pack_id(EntryType.STATUS)) {
       await LancerActiveEffect.populateFromItems();
-      //@ts-expect-error v11 types
-      CONFIG.statusEffects.forEach(e => (e.name = game.i18n.localize(e.name)));
     }
   });
   Hooks.on("itemCreated", async (item: LancerItem) => {
     if (!item.is_status()) return;
     await LancerActiveEffect.populateFromItems();
-    //@ts-expect-error v11 types
-    CONFIG.statusEffects.forEach(e => (e.name = game.i18n.localize(e.name)));
   });
 });
 
-// Set up Dice So Nice to icrementally show attacks then damge rolls
 Hooks.once("ready", () => {
-  if (game.modules.get("dice-so-nice")?.active && !game.settings.get(game.system.id, LANCER.setting_dsn_setup)) {
+  if (
+    game.user!.isGM &&
+    game.modules.get("dice-so-nice")?.active &&
+    !game.settings.get(game.system.id, LANCER.setting_dsn_setup)
+  ) {
+    // Set up Dice So Nice to icrementally show attacks then damge rolls
     console.log(`${lp} First login setup for Dice So Nice`);
     game.settings.set("dice-so-nice", "enabledSimultaneousRollForMessage", false);
     game.settings.set(game.system.id, LANCER.setting_dsn_setup, true);
   }
-});
 
-// Migrate settings from Lancer Condition Icons and disable the module
-Hooks.once("ready", migrateLancerConditions);
+  // Migrate settings from Lancer Condition Icons and disable the module
+  migrateLancerConditions();
+});
 
 // Attach socket listeners
 Hooks.once("ready", () => {
@@ -370,10 +370,6 @@ Hooks.once("ready", () => {
       tokenScrollText(msg.data);
     }
   });
-});
-
-Hooks.once("canvasInit", () => {
-  SquareGrid.prototype.measureDistances = measureDistances;
 });
 
 // Action Manager hooks.
@@ -385,7 +381,7 @@ Hooks.on("updateToken", (_scene: Scene, _token: Token, diff: any, _options: any,
   if (diff.hasOwnProperty("y") || diff.hasOwnProperty("x")) return;
   game.action_manager?.update();
 });
-Hooks.on("updateActor", (_actor: LancerActor, changes: DeepPartial<LancerActor["data"]>): void => {
+Hooks.on("updateActor", (...[_actor, changes]: Parameters<Hooks.UpdateDocument<typeof Actor>>): void => {
   game.action_manager?.update();
   triggerStrussFlow(_actor, changes);
 });
@@ -401,9 +397,13 @@ Hooks.on("createCombat", (_actor: Actor) => {
 Hooks.on("deleteCombat", (_actor: Actor) => {
   game.action_manager?.update();
 });
-Hooks.on("updateCombat", (_combat: Combat, changes: DeepPartial<Combat["data"]>) => {
-  if (getAutomationOptions().remove_templates && "turn" in changes && game.user?.isGM) {
-    canvas.templates?.placeables.forEach(t => {
+Hooks.on("updateCombat", (_combat: Combat, changes: object) => {
+  if (
+    game.settings.get(game.system.id, LANCER.setting_automation).remove_templates &&
+    "turn" in changes &&
+    game.user?.isGM
+  ) {
+    canvas?.templates?.placeables.forEach(t => {
       if (t.document.getFlag("lancer", "isAttack")) t.document.delete();
     });
   }
@@ -413,61 +413,57 @@ Hooks.on("updateCombat", (_combat: Combat, changes: DeepPartial<Combat["data"]>)
     ui.combatCarousel?.render();
   }
 });
-//
+
+// Handle dropping statuses on tokens
+Hooks.on("dropCanvasData", dropStatusToCanvas);
 
 // Create sidebar button to import LCP
 Hooks.on("renderSidebarTab", async (app: Application, html: HTMLElement) => {
-  addLCPManager(app, html);
+  addLCPManagerButton(app, html);
 });
 
 // TODO: keep or remove?
-Hooks.on("getActorDirectoryEntryContext", (_html: JQuery<HTMLElement>, ctxOptions: ContextMenuEntry[]) => {
-  const editMigratePilot: ContextMenuEntry = {
-    name: "Migrate Pilot",
-    icon: '<i class="fas fa-user-circle"></i>',
-    condition: (li: any) => {
-      const actor = game.actors?.get(li.data("documentId"));
-      return actor?.type === "pilot" && validForExport(actor);
-    },
-    callback: (li: any) => {
-      const actor = game.actors?.get(li.data("documentId"));
-      // @ts-ignore Migrations?
-      const dump = handleActorExport(actor, false);
-      if (dump && actor?.is_pilot()) importCC(actor, dump as any, true);
-    },
-  };
+// This seems broken
+// Hooks.on("getActorDirectoryEntryContext", (_html: JQuery<HTMLElement>, ctxOptions: ContextMenuEntry[]) => {
+//   const editMigratePilot: ContextMenuEntry = {
+//     name: "Migrate Pilot",
+//     icon: '<i class="fas fa-user-circle"></i>',
+//     condition: (li: any) => {
+//       const actor = game.actors?.get(li.data("documentId"));
+//       return actor?.type === "pilot" && validForExport(actor);
+//     },
+//     callback: (li: any) => {
+//       const actor = game.actors?.get(li.data("documentId"));
+//       // @ts-expect-error Migrations?
+//       const dump = handleActorExport(actor, false);
+//       if (dump && actor?.is_pilot()) importCC(actor, dump as any, true);
+//     },
+//   };
 
-  const editExportPilot: ContextMenuEntry = {
-    name: "Export Pilot",
-    icon: '<i class="fas fa-user-circle"></i>',
-    condition: (li: any) => {
-      const actor = game.actors?.get(li.data("documentId"));
-      return actor?.type === "pilot" && validForExport(actor);
-    },
-    callback: (li: any) => {
-      const actor = game.actors?.get(li.data("documentId"));
-      // @ts-ignore Migrations?
-      handleActorExport(actor, true);
-    },
-  };
+//   const editExportPilot: ContextMenuEntry = {
+//     name: "Export Pilot",
+//     icon: '<i class="fas fa-user-circle"></i>',
+//     condition: (li: any) => {
+//       const actor = game.actors?.get(li.data("documentId"));
+//       return actor?.type === "pilot" && validForExport(actor);
+//     },
+//     callback: (li: any) => {
+//       const actor = game.actors?.get(li.data("documentId"));
+//       // @ts-expect-error Migrations?
+//       handleActorExport(actor, true);
+//     },
+//   };
 
-  ctxOptions.unshift(editMigratePilot);
-  ctxOptions.unshift(editExportPilot);
-});
+//   ctxOptions.unshift(editMigratePilot);
+//   ctxOptions.unshift(editExportPilot);
+// });
 
 // For the settings tab
 Hooks.on("renderSettings", async (app: Application, html: HTMLElement) => {
   addSettingsButtons(app, html);
 });
-Hooks.on("renderCombatTracker", (...[_app, html]: Parameters<Hooks.RenderApplication<CombatTracker>>) => {
-  html
-    .find(".combat-settings")
-    .off("click")
-    .on("click", ev => {
-      ev.preventDefault();
-      new LancerCombatTrackerConfig(undefined, {}).render(true);
-    });
-});
+Hooks.on("renderCombatTrackerConfig", extendCombatTrackerConfig);
+Hooks.on("closeCombatTrackerConfig", onCloseCombatTrackerConfig);
 
 // Disable token vision and fog exploration by default in scene config
 Hooks.on("preCreateScene", (scene: any) => {
@@ -563,8 +559,8 @@ Hooks.on("renderChatMessage", async (cm: ChatMessage, html: JQuery, data: any) =
       | JQuery.MouseEnterEvent<HTMLElement, undefined, HTMLElement, HTMLElement>
       | JQuery.MouseLeaveEvent<HTMLElement, undefined, HTMLElement, HTMLElement>
   ) => {
+    if (!canvas.ready) return;
     const targetId = $(ev.target).closest("[data-uuid]").data("uuid");
-    console.log(targetId);
     if (!targetId) return;
     const token = (await fromUuid(targetId)) as LancerToken | null;
     if (!token) return;
@@ -595,36 +591,30 @@ Hooks.on("hotbarDrop", (_bar: any, data: any, slot: number) => {
 });
 
 /**
- * Prompts users to install core data
- * Designed for use the first time you launch a new world
+ * For use on first run of a new world. Open the LCP manager so user can install core data.
  */
 async function promptInstallCoreData() {
-  let version = core_update;
-  let text = `
+  // Open the LCP manager
+  let app = new LCPManager();
+  await app.render(true);
+  // Render a dialog on top to explain
+  let content = `
   <h2 style="text-align: center">WELCOME GAME MASTER</h2>
   <p style="text-align: center;margin-bottom: 1em">THIS IS YOUR <span class="horus--very--subtle">FIRST</span> TIME LAUNCHING</p>
-  <p style="text-align: center;margin-bottom: 1em">WOULD YOU LIKE TO INSTALL <span class="horus--very--subtle">CORE</span> LANCER DATA <span class="horus--very--subtle">v${version}?</span></p>`;
-  new Dialog(
-    {
-      title: `Install Core Data`,
-      content: text,
-      buttons: {
-        yes: {
-          label: "Yes",
-          callback: async () => {
-            await updateCore(version);
-          },
-        },
-        close: {
-          label: "No",
-        },
-      },
-      default: "No",
-    },
-    {
+  <p style="text-align: center;margin-bottom: 1em">Use the LANCER Compendium Manager window to install the <span class="horus--very--subtle">LANCER DATA</span> you wish to use.</p>`;
+  new foundry.applications.api.DialogV2({
+    window: { title: `Install Core Data`, icon: "cci cci-content-manager i--sm" },
+    position: {
       width: 700,
-    }
-  ).render(true);
+    },
+    content,
+    buttons: [
+      {
+        action: "close",
+        label: "Close",
+      },
+    ],
+  }).render(true);
 }
 
 function setupSheets() {
@@ -669,16 +659,13 @@ function setupSheets() {
  * Check whether the world needs any migration.
  * @return True if migration is required
  */
-async function versionCheck(): Promise<"yes" | "no" | "too_old"> {
+async function versionCheck(): Promise<"first_run" | "yes" | "no" | "too_old"> {
   // Determine whether a system migration is required and feasible
   const currentVersion = game.settings.get(game.system.id, LANCER.setting_migration_version);
 
   // If it's 0 then it's a fresh install
   if (currentVersion === "0" || !currentVersion) {
-    // @ts-expect-error Should be fixed with v10 types
-    game.settings.set(game.system.id, LANCER.setting_migration_version, game.system.version);
-    await promptInstallCoreData();
-    return "no";
+    return "first_run";
   }
 
   // Check if its before new rolling migration system was integrated
@@ -687,18 +674,53 @@ async function versionCheck(): Promise<"yes" | "no" | "too_old"> {
   }
 
   // Otherwise return if version is even slightly out of date
-  // @ts-expect-error version property is missing
   return foundry.utils.isNewerVersion(game.system.version, currentVersion) ? "yes" : "no";
+}
+
+async function promptLCPManagerTour() {
+  const showTour = await foundry.applications.api.DialogV2.confirm({
+    // @ts-expect-error This should expect a partial
+    window: { title: "Compendium Manager Tour?" },
+    content: "The LANCER Compendium Manager has had a major update. Would you like to get a tour?",
+    rejectClose: false,
+  });
+  if (!showTour) return;
+  const lcpTour: Tour | undefined = game.tours.get(`${game.system.id}.lcp`);
+  if (!lcpTour) {
+    console.error(`${lp} LCP manager tour not found.`);
+    return;
+  }
+  console.log(`${lp} Starting LCP manager tour`);
+  lcpTour.start();
 }
 
 /**
  * Performs our version validation and migration
  */
 async function doMigration() {
+  const oldVersion = game.settings.get(game.system.id, LANCER.setting_migration_version);
+  // Auxiliary - settings and tour migrations
+  if (oldVersion && foundry.utils.isNewerVersion("2.7.0", oldVersion)) {
+    console.log(`${lp} Game is migrating from ${oldVersion}. Should show LCP manager tour`);
+    // New LCP manager was introduced in version 2.7.0
+    // Reset LCP manager tour
+    const lcpTour: Tour | undefined = game.tours.get(`${game.system.id}.lcp`);
+    if (!lcpTour) {
+      console.error(`${lp} LCP manager tour not found.`);
+      return;
+    }
+    await lcpTour.reset();
+    // Ask to show LCP manager tour. Do not await, let it sit in the background
+    // while the rest of the migration work proceeds.
+    promptLCPManagerTour();
+  }
+
   // Determine whether a system migration  is needed
   let needsMigrate = await versionCheck();
-
-  if (needsMigrate == "too_old") {
+  if (needsMigrate == "first_run") {
+    game.settings.set(game.system.id, LANCER.setting_migration_version, game.system.version);
+    await promptInstallCoreData();
+  } else if (needsMigrate == "too_old") {
     // System version is too old for migration
     ui.notifications!.error(
       `Your LANCER system data is from too old a version (${game.settings.get(
@@ -709,16 +731,14 @@ async function doMigration() {
     );
     return;
   } else if (needsMigrate == "yes" && game.user!.isGM) {
-    // Un-hide the welcome message
-    await game.settings.set(game.system.id, LANCER.setting_welcome, false);
+    // Print the update message to chat
+    printUpdateMessage();
     ui.notifications!.info(
-      // @ts-expect-error Packages do include a version string
       `Migrating to LANCER version ${game.system.version}. Please be patient and wait until migration completes.`,
       { permanent: true }
     );
     await migrations.migrateWorld();
     // Update the stored version number for next migration
-    // @ts-expect-error Packages do include a version string
     await game.settings.set(game.system.id, LANCER.setting_migration_version, game.system.version);
   } else if (needsMigrate == "yes") {
     ui.notifications!.warn(
@@ -727,7 +747,6 @@ async function doMigration() {
     );
   } else if (needsMigrate == "no" && game.user!.isGM) {
     // Update the stored version number for next migration
-    // @ts-expect-error Packages do include a version string
     await game.settings.set(game.system.id, LANCER.setting_migration_version, game.system.version);
   }
 }
@@ -752,63 +771,16 @@ async function configureAmplify() {
   }
 }
 
-async function showChangelog() {
-  // Show welcome message if not hidden.
-  if (!game.settings.get(game.system.id, LANCER.setting_welcome)) {
-    let renderChangelog = (changelog: string) => {
-      new Dialog(
-        {
-          // @ts-expect-error Should be fixed with v10 types
-          title: `Welcome to LANCER v${game.system.version}`,
-          content: WELCOME(changelog),
-          buttons: {
-            dont_show: {
-              label: "Do Not Show Again",
-              callback: async () => {
-                await game.settings.set(game.system.id, LANCER.setting_welcome, true);
-              },
-            },
-            close: {
-              label: "Close",
-            },
-          },
-          default: "Close",
-        },
-        {
-          width: 700,
-        }
-      ).render(true);
-    };
-
-    // Get an automatic changelog for our version
-    let req = $.get(
-      // @ts-expect-error Should be fixed with v10 types
-      `https://raw.githubusercontent.com/Eranziel/foundryvtt-lancer/v${game.system.version}/CHANGELOG.md`
-    );
-    req.done(async (data, _status) => {
-      // Regex magic to only grab the first 25 lines
-      let r = /(?:[^\n]*\n){25}/;
-      let trimmedChangelog = data.match(r)[0];
-
-      // Grab the position of the last H1 and trim to that to ensure we split along version lines
-      // But also set a min so we're keeping at least one version
-      let lastH1Pos = trimmedChangelog.lastIndexOf("\n# ");
-      if (lastH1Pos < 20) lastH1Pos = trimmedChangelog.length;
-
-      trimmedChangelog = trimmedChangelog.substring(0, lastH1Pos);
-
-      let marked = await import("marked");
-      let changelog = marked.parse(trimmedChangelog);
-
-      renderChangelog(changelog);
-    });
-
-    req.fail((_data, _status) => {
-      let errorText = `<h2>Error retrieving changelog</h2>`;
-
-      renderChangelog(errorText);
-    });
-  }
+/**
+ * Print a chat message to share the changelog link and legalese journal.
+ */
+async function printUpdateMessage() {
+  // Wait until sidebar is ready to render messages
+  while (!ui.sidebar.rendered) await new Promise(resolve => setTimeout(resolve, 100));
+  await ChatMessage.create({
+    content: WELCOME(),
+    speaker: { alias: `LANCER System v${game.system.version}` },
+  });
 }
 
 function addSettingsButtons(_app: Application, html: HTMLElement) {
@@ -835,20 +807,21 @@ function addSettingsButtons(_app: Application, html: HTMLElement) {
   faqButton.on("click", async () => {
     let helpContent = await renderTemplate(`systems/${game.system.id}/templates/window/lancerHelp.hbs`, {});
 
-    new Dialog(
-      {
+    new foundry.applications.api.DialogV2({
+      window: {
         title: `LANCER Help`,
-        content: helpContent,
-        buttons: {
-          close: {
-            label: "Close",
-          },
-        },
-        default: "Close",
+        icon: "fas fa-robot",
       },
-      {
+      content: helpContent,
+      position: {
         width: 600,
-      }
-    ).render(true);
+      },
+      buttons: [
+        {
+          action: "close",
+          label: "Close",
+        },
+      ],
+    }).render(true);
   });
 }

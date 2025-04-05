@@ -1,3 +1,4 @@
+import type { DeepPartial } from "@league-of-foundry-developers/foundry-vtt-types/src/types/utils.mjs";
 import { EntryType, WeaponSize, WeaponType } from "../../enums";
 import { restrict_enum } from "../../helpers/commons";
 import { SourceData } from "../../source-template";
@@ -9,32 +10,36 @@ import { CounterField, unpackCounter } from "../bits/counter";
 import { DamageField, unpackDamage } from "../bits/damage";
 import { RangeField, unpackRange } from "../bits/range";
 import { SynergyField, unpackSynergy } from "../bits/synergy";
-import { TagField, unpackTag } from "../bits/tag";
-import { ControlledLengthArrayField, LancerDataModel, LIDField, UnpackContext } from "../shared";
+import { TagData, TagField, unpackTag } from "../bits/tag";
+import { ControlledLengthArrayField, LIDField, LancerDataModel, UnpackContext } from "../shared";
 import {
-  template_universal_item,
+  addDeployableTags,
+  migrateManufacturer,
   template_destructible,
   template_licensed,
+  template_universal_item,
   template_uses,
-  migrateManufacturer,
 } from "./shared";
 
-const fields: any = foundry.data.fields;
+const fields = foundry.data.fields;
 
-// @ts-ignore
-export class MechWeaponModel extends LancerDataModel<"MechWeaponModel"> {
+export class MechWeaponModel extends LancerDataModel<DataSchema, Item> {
   static defineSchema() {
     return {
       deployables: new fields.ArrayField(new LIDField()),
       integrated: new fields.ArrayField(new LIDField()),
       sp: new fields.NumberField({ nullable: false, initial: 0 }),
+      // @ts-expect-error
       actions: new fields.ArrayField(new ActionField()),
       profiles: new ControlledLengthArrayField(
         new fields.SchemaField({
           name: new fields.StringField({ initial: "Base Profile" }),
           type: new fields.StringField({ choices: Object.values(WeaponType), initial: WeaponType.Rifle }),
+          // @ts-expect-error
           damage: new fields.ArrayField(new DamageField()),
+          // @ts-expect-error
           range: new fields.ArrayField(new RangeField()),
+          // @ts-expect-error
           tags: new fields.ArrayField(new TagField()),
           description: new fields.StringField(),
           effect: new fields.StringField(),
@@ -44,9 +49,13 @@ export class MechWeaponModel extends LancerDataModel<"MechWeaponModel"> {
           cost: new fields.NumberField({ nullable: false, initial: 0 }),
           skirmishable: new fields.BooleanField(),
           barrageable: new fields.BooleanField(),
+          // @ts-expect-error
           actions: new fields.ArrayField(new ActionField()),
+          // @ts-expect-error
           bonuses: new fields.ArrayField(new BonusField()),
+          // @ts-expect-error
           synergies: new fields.ArrayField(new SynergyField()),
+          // @ts-expect-error
           counters: new fields.ArrayField(new CounterField()),
         }),
         { length: 1, overflow: true }
@@ -73,8 +82,6 @@ export class MechWeaponModel extends LancerDataModel<"MechWeaponModel"> {
     if (data.source) {
       data.manufacturer = migrateManufacturer(data.source);
     }
-
-    // @ts-expect-error v11
     return super.migrateData(data);
   }
 }
@@ -89,21 +96,28 @@ export function unpackMechWeapon(
 } {
   let profiles: Array<Partial<SourceData.MechWeapon["profiles"][0]>> = [];
 
+  let { deployables: parentDeployables, tags: parentTags } = addDeployableTags(data.deployables, data.tags, context);
   // These can live at parent or profile level - extract them first
-  let parent_deployables = data.deployables?.map(d => unpackDeployable(d, context)) ?? [];
-  let parent_integrated = data.integrated ?? [];
-  let parent_tags = data.tags?.map(unpackTag) ?? [];
+  parentDeployables = parentDeployables ?? [];
+  parentTags = parentTags ?? [];
+  let parentIntegrated = data.integrated ?? [];
 
   // Then unpack profiles, using the entire structure as a pseudo-profile if no specific profiles are given
-  let has_profiles = (data.profiles?.length ?? 0) > 0;
-  for (let prof of has_profiles ? data.profiles : [data]) {
+  let hasProfiles = (data.profiles?.length ?? 0) > 0;
+  for (let prof of hasProfiles ? data.profiles : [data]) {
     // Unpack sub components iff not substituted in from parent
-    let prof_deployables = has_profiles ? prof.deployables?.map(d => unpackDeployable(d, context)) ?? [] : [];
-    let prof_integrated = has_profiles ? prof.deployables?.map(d => unpackDeployable(d, context)) ?? [] : [];
+    let profileDeployables: string[] = [];
+    let profileTags: TagData[] = [];
+    if (hasProfiles) {
+      const { deployables: newDeployables, tags: newTags } = addDeployableTags(prof.deployables, prof.tags, context);
+
+      profileDeployables = newDeployables ?? [];
+      profileTags = newTags ?? [];
+    }
 
     // Then just store them at parent level
-    parent_deployables.push(...prof_deployables);
-    parent_integrated.push(...prof_integrated);
+    parentDeployables.push(...profileDeployables);
+    parentIntegrated.push(...(prof.integrated ?? []));
 
     // Barrageable have a weird interaction.
     let barrageable: boolean;
@@ -126,7 +140,7 @@ export function unpackMechWeapon(
     }
 
     // The rest is left to the profile
-    let tags = has_profiles ? [...parent_tags, ...(prof.tags?.map(unpackTag) ?? [])] : parent_tags;
+    let tags = hasProfiles ? [...parentTags, ...profileTags] : parentTags;
     profiles.push({
       damage: prof.damage?.filter(d => d.val != "N/A").map(unpackDamage),
       range: prof.range?.filter(d => d.val != "N/A").map(unpackRange),
@@ -153,7 +167,7 @@ export function unpackMechWeapon(
     type: EntryType.MECH_WEAPON,
     system: {
       cascading: undefined,
-      deployables: data.deployables?.map(d => unpackDeployable(d, context)),
+      deployables: parentDeployables,
       destroyed: undefined,
       integrated: data.integrated,
       license: data.license_id || data.license,
@@ -167,7 +181,7 @@ export function unpackMechWeapon(
       no_mods: data.no_mods,
       no_synergies: data.no_synergy,
       actions: data.actions?.map(unpackAction) || [],
-      profiles,
+      profiles: profiles as any,
       selected_profile_index: 0,
       size: data.mount,
       sp: data.sp,

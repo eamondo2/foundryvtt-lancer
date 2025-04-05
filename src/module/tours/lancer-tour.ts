@@ -1,35 +1,17 @@
 declare global {
-  interface Game {
-    tours: any;
+  // Extend tourstep
+  interface TourStep {
+    click?: boolean;
+    sidebarTab?: string;
+    inApp?: boolean;
   }
-  class Tour {
-    static fromJSON(json_file: string): Promise<Tour>;
-    currentStep: TourStep;
-
-    start(): Promise<unknown>;
-    exit(): void;
-    complete(): Promise<void>;
-    next(): Promise<void>;
-    previous(): Promise<void>;
-    protected _preStep(): Promise<void>;
-    protected _postStep(): Promise<void>;
-  }
-}
-
-interface TourStep {
-  id: string;
-  selector: string;
-  title: string;
-  content: string;
-  click?: boolean;
-  sidebarTab?: string;
-  inApp?: boolean;
 }
 
 import { LancerActor } from "../actor/lancer-actor";
-import { LCPManager } from "../apps/lcp-manager";
+import { LCPManager } from "../apps/lcp-manager/lcp-manager";
 import { LancerCombat } from "../combat/lancer-combat";
 import { EntryType } from "../enums";
+import { ContentSummary } from "../util/lcps";
 
 /**
  * LANCER Extensions to the foundry Tour class. Adds sidebarTab and click as
@@ -65,7 +47,7 @@ export class LancerTour extends Tour {
   protected async _postStep() {
     await super._postStep();
     if (this.currentStep?.click) {
-      document.querySelector<HTMLElement>(this.currentStep.selector)?.click();
+      document.querySelector<HTMLElement>(this.currentStep.selector!)?.click();
     }
   }
 }
@@ -78,24 +60,45 @@ export class LancerLcpTour extends LancerTour {
   protected async _preStep() {
     await super._preStep();
     if (!this.manager) this.manager = new LCPManager();
-    if (this.currentStep.id === "lcpImport") {
+    if (this.currentStep?.inApp) {
+      if (!this.manager.rendered) {
+        await this.manager.render(true);
+        await this.manager.renderPromise;
+        // Wait for it to load the official packs from the server
+        while (this.manager.component.loading) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+    }
+    if (this.currentStep?.id === "lcpTable") {
       // This is a fake lcp that contains no items
-      const lcp_tribute = window.atob(
-        "UEsDBBQAAAAIAANod1iaTB1/iQAAAMEAAAARABwAbGNwX21hbmlmZXN0Lmpzb25VVAkAA6UY/2Wl" +
-          "GP9ldXgLAAEE6AMAAAToAwAANc27DsIwDAXQPV9hZUZRxcgIYmNgYEehdYlRXnLcUgnx76RALE/3" +
-          "WNcvBXV0tAH1DvRxsSF7hNPhrDc/spO4xCvuk5fS4gFLz5SFUlzt4qhA3ZgExCHcGa1gEfB9Borf" +
-          "7JnYDwba6WOqbEGYbpOgacUkGK6ZcaRlLR5nkUYzcvn/25rOdFq91QdQSwECHgMUAAAACAADaHdY" +
-          "mkwdf4kAAADBAAAAEQAYAAAAAAABAAAApIEAAAAAbGNwX21hbmlmZXN0Lmpzb25VVAUAA6UY/2V1" +
-          "eAsAAQToAwAABOgDAABQSwUGAAAAAAEAAQBXAAAA1AAAAAAA"
-      );
-      await this.manager._onLcpParsed(lcp_tribute);
+      const lcp_tribute: ContentSummary = {
+        item_prefix: "",
+        author: "No Man",
+        name: "Demo LCP",
+        version: "1.0.0",
+        bonds: 1,
+        gear: 1,
+        mods: 1,
+        npc_classes: 1,
+        npc_features: 1,
+        npc_templates: 1,
+        reserves: 1,
+        skills: 1,
+        systems: 1,
+        talents: 1,
+        frames: 1,
+        weapons: 1,
+      };
+      this.manager.injectContentPack(lcp_tribute);
       // Delay to avoid race condition
       await new Promise(resolve => setTimeout(resolve, 30));
     }
-    if (this.currentStep.inApp) {
-      // @ts-expect-error Bypass protected
-      await this.manager._render(true);
-    }
+  }
+
+  protected async _tearDown(complete: boolean) {
+    this.manager?.injectContentPack(null);
+    super._tearDown(complete);
   }
 }
 
@@ -163,7 +166,7 @@ export class LancerNPCTour extends LancerTour {
     }
     // @ts-expect-error Bypass protected
     await this.npc?.sheet?._render(true);
-    if (["baseFeatures", "optionalFeatures"].includes(this.currentStep?.id)) {
+    if (["baseFeatures", "optionalFeatures"].includes(this.currentStep?.id!)) {
       // @ts-expect-error Bypass protected
       await this.npc?.system?.class?.sheet?._render(true);
     }
@@ -239,7 +242,7 @@ export class LancerCombatTour extends LancerTour {
     if (!this.combat) this.combat = (await this._setupCombat())!;
     await this.combat.activate();
     if (!this.combat.started) await this.combat.startCombat();
-    if (this.currentStep.id === "endTurn") {
+    if (this.currentStep?.id === "endTurn") {
       const turn = this.combat.turns.find(t => t.getFlag(game.system.id, "tour") === "ultra")?.id ?? "";
       await this.combat.activateCombatant(turn, true);
       // Delay to avoid race condition

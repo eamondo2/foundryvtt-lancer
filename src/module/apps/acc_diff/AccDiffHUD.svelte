@@ -17,7 +17,7 @@
 
   import type { LancerItem, LancerSKILL } from "../../item/lancer-item";
   import { EntryType, NpcFeatureType, RangeType } from "../../enums";
-  import { WeaponRangeTemplate } from "../../pixi/weapon-range-template";
+  import { WeaponRangeTemplate } from "../../canvas/weapon-range-template";
   import { targetsFromTemplate } from "../../flows/_template";
   import type { LancerActor, LancerMECH, LancerPILOT } from "../../actor/lancer-actor";
   import HudCheckbox from "../components/HudCheckbox.svelte";
@@ -33,9 +33,9 @@
   export let kind: "hase" | "attack";
 
   // tell svelte of externally computed dependency arrows
-  // @ts-ignore i.e., base depends on weapon
+  // @ts-expect-error i.e., base depends on weapon
   $: base = (weapon, base);
-  // @ts-ignore i.e., targets depend on weapon and base
+  // @ts-expect-error i.e., targets depend on weapon and base
   $: targets = (weapon, base, targets);
   $: profile = lancerItem ? findProfile() : null;
   $: ranges = lancerItem ? findRanges() : null;
@@ -83,8 +83,8 @@
     // Ignore target hovering after the form has been submitted, to avoid flickering when
     // the UI slides down.
     if (submitted) return;
+    // @ts-expect-error Infinite recursion?
     const thtModule = game.modules.get("terrain-height-tools");
-    // @ts-expect-error v10 types
     if (!thtModule?.active || foundry.utils.isNewerVersion("0.3.3", thtModule.version)) {
       // @ts-expect-error not supposed to use a private method
       target._onHoverIn(event);
@@ -95,7 +95,6 @@
 
   function targetHoverOut(event: MouseEvent, target: LancerToken) {
     const thtModule = game.modules.get("terrain-height-tools");
-    // @ts-expect-error v10 types
     if (!thtModule?.active || foundry.utils.isNewerVersion("0.3.3", thtModule.version)) {
       // @ts-expect-error not supposed to use a private method
       target._onHoverOut(event);
@@ -112,6 +111,8 @@
   }
 
   function clearLos() {
+    const thtModule = game.modules.get("terrain-height-tools");
+    if (!thtModule?.active || foundry.utils.isNewerVersion("0.3.3", thtModule.version)) return;
     terrainHeightTools!.clearLineOfSightRays();
   }
 
@@ -131,12 +132,51 @@
     };
   }
 
+  function isAttack() {
+    return kind === "attack";
+  }
+
   function isTech() {
-    if (!lancerItem) return false;
+    if (!lancerItem) return title.toLowerCase() === "tech attack";
     if (lancerItem.is_mech_weapon()) return false;
     if (lancerItem.is_pilot_weapon()) return false;
     if (lancerItem.is_npc_feature() && lancerItem.system.type === NpcFeatureType.Weapon) return false;
     return true;
+  }
+
+  function gritLabel() {
+    // This is a tech attack
+    if (isTech()) {
+      if (lancerItem?.is_npc_feature() && lancerItem.system.type === NpcFeatureType.Tech) {
+        return "Tech Item Base";
+      }
+      return "Tech Attack";
+    }
+    // Not a tech attack and we have an item. Base the label on the item type.
+    if (lancerItem) {
+      if (lancerItem.is_mech_weapon() || lancerItem.is_pilot_weapon()) {
+        return "Grit";
+      }
+      if (lancerItem.is_npc_feature() && lancerItem.system.type === NpcFeatureType.Weapon) {
+        return "Weapon Base";
+      }
+    }
+    // Not a tech attack and we have no item. Base the label on the actor type.
+    if (lancerActor) {
+      if (lancerActor.is_npc()) {
+        return "Tier";
+      }
+      if (lancerActor.is_mech() || lancerActor.is_pilot() || lancerActor.is_deployable()) {
+        return "Grit";
+      }
+    }
+    // Default fallback
+    return "Grit";
+  }
+
+  function gritSign() {
+    if (base.grit > 0) return "+";
+    return "";
   }
 
   function findProfile() {
@@ -153,7 +193,6 @@
     const t = WeaponRangeTemplate.fromRange(range, token);
     if (!t) return;
     fade("out");
-    // @ts-expect-error v10
     t.document.updateSource({ [`flags.${game.system.id}.isAttack`]: true });
     t.placeTemplate()
       .catch(e => {
@@ -268,26 +307,34 @@
         <PlusMinusInput bind:value={base.difficulty} id="accdiff-other-diff" />
       </div>
     </div>
-    <label class="flexrow accdiff-footer accdiff-weight lancer-border-primary" for="accdiff-bonuses">
-      Flat Bonus and Skill Bonus WAHOO
-    </label>
-    <div id="accdiff-bonuses" class="accdiff-grid">
-      <div class="accdiff-other-grid lancer-border-primary" style="border-right-width: 1px;border-right-style: dashed;">
-        <PlusMinusInput bind:value={base.flatBonusInjected} id="accdiff-flat-mod" />
-      </div>
-      <div class="accdiff-other-grid lancer-border-primary" style="border-right-width: 1px;border-right-style: dashed;">
-        <select bind:value={base.skillBonusInjected}>
-          <option value="{placeHolderSkillSelection.skillBonus}_{placeHolderSkillSelection.skillName}" selected
-            >{placeHolderSkillSelection.skillName} +{placeHolderSkillSelection.skillBonus}</option
-          >
-          {#each populateSkillList() as item, i}
-            <option selected={i === 0} value="{item.skillBonus}_{item.skillName}"
-              >{item.skillName} +{item.skillBonus}</option
+    {#if isAttack()}
+      <label class="flexrow accdiff-footer accdiff-weight lancer-border-primary" for="accdiff-bonuses">
+        Flat Bonus and Skill Bonus WAHOO
+      </label>
+      <div id="accdiff-bonuses" class="accdiff-grid">
+        <div
+          class="accdiff-other-grid lancer-border-primary"
+          style="border-right-width: 1px;border-right-style: dashed;"
+        >
+          <PlusMinusInput bind:value={base.flatBonus} id="accdiff-flat-mod" />
+        </div>
+        <div
+          class="accdiff-other-grid lancer-border-primary"
+          style="border-right-width: 1px;border-right-style: dashed;"
+        >
+          <select bind:value={base.skillBonusInjected}>
+            <option value="{placeHolderSkillSelection.skillBonus}_{placeHolderSkillSelection.skillName}" selected
+              >{placeHolderSkillSelection.skillName} +{placeHolderSkillSelection.skillBonus}</option
             >
-          {/each}
-        </select>
+            {#each populateSkillList() as item, i}
+              <option selected={i === 0} value="{item.skillBonus}_{item.skillName}"
+                >{item.skillName} +{item.skillBonus}</option
+              >
+            {/each}
+          </select>
+        </div>
       </div>
-    </div>
+    {/if}
     <div class="flex-col accdiff-footer lancer-border-primary">
       {#if ranges && ranges.length > 0}
         <span class="accdiff-weight flex-center flexrow">Targeting</span>
@@ -428,6 +475,7 @@
     padding-left: 5px;
     display: flex;
     justify-content: center;
+    align-items: center;
   }
   :global(.accdiff-weight) {
     justify-content: center;
@@ -512,6 +560,8 @@
     display: grid;
     grid-template-columns: auto auto auto;
     grid-row-gap: 12px;
+    max-height: 320px;
+    overflow-y: scroll;
   }
 
   .accdiff-target {

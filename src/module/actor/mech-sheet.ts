@@ -16,7 +16,7 @@ export class LancerMechSheet extends LancerActorSheet<EntryType.MECH> {
    * Extend and override the default options used by the NPC Sheet
    */
   static get defaultOptions() {
-    return mergeObject(super.defaultOptions, {
+    return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["lancer", "sheet", "actor", "mech"],
       template: `systems/${game.system.id}/templates/actor/mech.hbs`,
       width: 900,
@@ -56,8 +56,13 @@ export class LancerMechSheet extends LancerActorSheet<EntryType.MECH> {
     if (item.type == "Actor" && item.document.is_pilot()) {
       // For setting pilot
       return true;
-    } else if (item.type == "Item") {
-      return item.document.is_mech_system() || item.document.is_mech_weapon() || item.document.is_frame();
+    } else if (item.type === "Item") {
+      return (
+        item.document.is_mech_system() ||
+        item.document.is_mech_weapon() ||
+        item.document.is_frame() ||
+        item.document.is_status()
+      );
     } else {
       return false;
     }
@@ -271,7 +276,7 @@ export class LancerMechSheet extends LancerActorSheet<EntryType.MECH> {
     }
   }
 
-  async getData(): Promise<LancerActorSheetData<EntryType.MECH>> {
+  async getData(): Promise<object> {
     let data = await super.getData();
     // @ts-expect-error
     data.pilot = this.actor.system.pilot?.value;

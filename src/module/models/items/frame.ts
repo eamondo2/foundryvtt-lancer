@@ -1,3 +1,5 @@
+import type { DeepPartial } from "@league-of-foundry-developers/foundry-vtt-types/src/types/utils.mjs";
+import { frameToPath } from "../../actor/retrograde-map";
 import { ActivationType, EntryType, FrameEffectUse, MechType, MountType } from "../../enums";
 import { restrict_enum } from "../../helpers/commons";
 import { SourceData } from "../../source-template";
@@ -7,13 +9,11 @@ import { ActionField, repairActivationType, unpackAction } from "../bits/action"
 import { BonusField, unpackBonus } from "../bits/bonus";
 import { CounterField, unpackCounter } from "../bits/counter";
 import { SynergyField, unpackSynergy } from "../bits/synergy";
-import { TagField, unpackTag } from "../bits/tag";
-import { LancerDataModel, LIDField, UnpackContext } from "../shared";
-import { template_universal_item, template_licensed, migrateManufacturer } from "./shared";
-import { frameToPath } from "../../actor/retrograde-map";
+import { TagField } from "../bits/tag";
+import { LIDField, LancerDataModel, UnpackContext } from "../shared";
+import { addDeployableTags, migrateManufacturer, template_licensed, template_universal_item } from "./shared";
 
-// @ts-ignore
-const fields: any = foundry.data.fields;
+const fields = foundry.data.fields;
 
 const frame_schema = {
   description: new fields.HTMLField(),
@@ -39,11 +39,15 @@ const frame_schema = {
     new fields.SchemaField({
       name: new fields.StringField(),
       description: new fields.HTMLField(),
+      // @ts-expect-error
       bonuses: new fields.ArrayField(new BonusField()),
+      // @ts-expect-error
       counters: new fields.ArrayField(new CounterField()),
       integrated: new fields.ArrayField(new LIDField()),
       deployables: new fields.ArrayField(new LIDField()),
+      // @ts-expect-error
       actions: new fields.ArrayField(new ActionField()),
+      // @ts-expect-error
       synergies: new fields.ArrayField(new SynergyField()),
       // use: new fields.StringField({ nullable: false, choices: Object.values(FrameEffectUse), initial: FrameEffectUse.Unknown, }),
       use: new fields.StringField({ nullable: true, initial: null }), // ^ Core data does not adhere to this schema
@@ -59,26 +63,34 @@ const frame_schema = {
 
     active_name: new fields.StringField(),
     active_effect: new fields.HTMLField(),
+    // @ts-expect-error
     active_synergies: new fields.ArrayField(new SynergyField()),
+    // @ts-expect-error
     active_bonuses: new fields.ArrayField(new BonusField()),
+    // @ts-expect-error
     active_actions: new fields.ArrayField(new ActionField()),
 
     passive_name: new fields.StringField(),
     passive_effect: new fields.HTMLField(),
+    // @ts-expect-error
     passive_synergies: new fields.ArrayField(new SynergyField()),
+    // @ts-expect-error
     passive_bonuses: new fields.ArrayField(new BonusField()),
+    // @ts-expect-error
     passive_actions: new fields.ArrayField(new ActionField()),
 
     deployables: new fields.ArrayField(new LIDField()),
+    // @ts-expect-error
     counters: new fields.ArrayField(new CounterField()),
     integrated: new fields.ArrayField(new LIDField()),
+    // @ts-expect-error
     tags: new fields.ArrayField(new TagField()),
   }),
   ...template_universal_item(),
   ...template_licensed(),
 };
 
-export class FrameModel extends LancerDataModel<"FrameModel"> {
+export class FrameModel extends LancerDataModel<DataSchema, Item> {
   static defineSchema() {
     return frame_schema;
   }
@@ -97,7 +109,6 @@ export class FrameModel extends LancerDataModel<"FrameModel"> {
       }
     }
 
-    // @ts-expect-error v11
     return super.migrateData(data);
   }
 }
@@ -114,6 +125,7 @@ export function unpackFrame(
   let cs = data.core_system;
   const frameImg = frameToPath(data.name);
   let csActivation = repairActivationType(cs.activation ?? ActivationType.Quick);
+  const { deployables, tags } = addDeployableTags(cs.deployables, cs.tags, context);
   return {
     name: data.name,
     type: EntryType.FRAME,
@@ -128,7 +140,7 @@ export function unpackFrame(
         active_synergies: cs.active_synergies?.map(unpackSynergy),
         counters: cs.counters?.map(unpackCounter),
         deactivation: cs.deactivation,
-        deployables: cs.deployables?.map(d => unpackDeployable(d, context)),
+        deployables,
         description: cs.description,
         integrated: cs.integrated,
         name: cs.name,
@@ -137,7 +149,7 @@ export function unpackFrame(
         passive_effect: cs.passive_effect,
         passive_name: cs.passive_name,
         passive_synergies: cs.passive_synergies?.map(unpackSynergy),
-        tags: cs.tags?.map(unpackTag),
+        tags,
         use: restrict_enum(FrameEffectUse, FrameEffectUse.Unknown, cs.use),
       },
       description: data.description,
@@ -149,14 +161,14 @@ export function unpackFrame(
       mounts: data.mounts,
       stats: data.stats,
       traits: data.traits?.map(t => ({
-        actions: t.actions?.map(unpackAction),
-        bonuses: t.bonuses?.map(unpackBonus),
-        counters: t.counters?.map(unpackCounter),
-        deployables: t.deployables?.map(d => unpackDeployable(d, context)),
+        actions: t.actions?.map(unpackAction) ?? [],
+        bonuses: t.bonuses?.map(unpackBonus) ?? [],
+        counters: t.counters?.map(unpackCounter) ?? [],
+        deployables: t.deployables?.map(d => unpackDeployable(d, context)) ?? [],
         description: t.description,
-        integrated: t.integrated,
+        integrated: t.integrated ?? [],
         name: t.name,
-        synergies: t.synergies?.map(unpackSynergy),
+        synergies: t.synergies?.map(unpackSynergy) ?? [],
         use: restrict_enum(FrameEffectUse, FrameEffectUse.Unknown, t.use),
       })),
     },

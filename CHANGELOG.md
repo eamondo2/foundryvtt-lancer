@@ -1,3 +1,99 @@
+# 2.8.0 (2025-03-30)
+
+## Features
+
+- #763 - Dragging a Status/Condition item onto an actor sheet or token will add the corresponding status to the token. You can also drag them from chat messages, like the structure/stress results!
+- #793 - Attack HUD Spotter integration now detects and uses the range increase from House Guard 1.
+- Existing Premade NPCs (in the compendium) are now updated when the corresponding LCP is re-imported.
+
+## Bug Fixes
+
+- #846 - Fix issues around manually creating & populating NPC classes, templates, and features. (Hopefully.)
+- #848 - Change default NPC heatcap to 0 so that NPCs without a heatcap (squads, monstrosity, etc...) get created with heatcap 0 instead of 5.
+- #849 - Change the "tech_attack" bonus type to directly add to the tech attack stat, instead of adding to a semi-hidden bonus field that only shows up in the attack HUD.
+
+# 2.7.2 (2025-03-11)
+
+## Bug Fixes
+
+- #818 - Fix pilot import from Comp/Con JSON when using Cyrillic (and other non-ASCII) characters.
+- #837 - Show pilot armor descriptions, and pilot armor and weapon tags.
+- #839 - Fix rendering NPC sheets with no class role, and fix saving NPC Class roles.
+- Fix error messages when building premade NPCs during LCP import.
+- Fix showing an LCP file's description, image, etc... when only one is selected in the Compendium Manager.
+- Improve license display on item sheets.
+
+# 2.7.1 (2025-03-05)
+
+## Bug Fixes
+
+- Fix a bug causing reserves from manually selected LCP files to not be imported.
+- Fix a bug causing the system update chat message to be duplicated every time the game page loads.
+
+## Misc
+
+- Give the "Clear Compendiums" button distinct styling and a confirmation prompt.
+- Update the "Lancer Help" and first launch dialogs to DialogV2.
+
+# 2.7.0 (2025-03-04)
+
+## Features
+
+- #654 - Compendium Manager Revamp. The LANCER Compendium Manager has been completely overhauled, including built-in importing of official data, multi-file select, and a little eye candy. Check out the tour!
+- Cut down on the amount of pop-up spam during/after world migration. Move acknowledgements and legal info into the system info journal.
+
+## Bug Fixes
+
+- #431 - Reserves are now imported from LCPs.
+
+# 2.6.2 (2025-03-01)
+
+## Bug Fixes
+
+- #806 - Automatically add flat bonus to attack HUD for "ranged_attack" and "tech_attack" bonus from items.
+- #809 - Add Deployable/Drone/Mine tags to items which have the matching kind of deployable, to match Comp/Con's similar functionality.
+- #822 - Fix "Scan (Journal)" macro for v12.
+- #821 - Add "bolster" and "flying" to all core icon sets for future integration with Lancer Ruler Integration.
+- Fix data model errors logged when importing the Shadow of the Wolf LCP.
+
+# 2.6.1 (2025-02-26)
+
+## Bug Fixes
+
+- #823 - Fix a bug causing Emperors to have "NaN" max hp.
+
+# 2.6.0 (2025-02-16)
+
+## Features
+
+- #650 - v12 Support! This release brings support for Foundry v12 and drops support for Foundry v11. Huge thanks to @BoltsJ for doing the heavy lifting!
+
+## Bug Fixes
+
+- Fix a bug during import causing pilots to be set as the deployer of their mech's deployables.
+
+# 2.5.0 (2025-02-08)
+
+This will be the final release for Foundry v11, barring any critical bug fixes.
+
+## Features
+
+- #799 - Add a space for configurable flat attack bonuses in the attack HUD. This also adds a display for non-configurable flat bonuses, such as Grit or Tech Attack. Thanks, @eamondo2!
+
+## Misc
+
+- #753 - Add an Intangible icon to Hayley's Condition & Status icon set. Thanks for providing the icon, @DirkMcThermot!
+- Change the Comp/Con login dialog to say "Comp/Con Email" instead of "Comp/Con Username" to reduce confusion.
+- Use the "Down and Out" status icon for the defeated state, instead of the default skull icon. If you wish to keep the old skull icon instead, make a "Down and Out" status item in your world and assign it the image path `icons/svg/skull.svg`.
+
+## Bug Fixes
+
+- #781 - Fix some styling so "undo damage" buttons do not bleed out of the chat card area.
+- #801 - Fix automation for consuming lock on with attacks. The lock on status will once again be removed after the attack, as long as a GM user is logged in.
+- #812 - Show limited uses indicator on NPC reactions and tech items.
+- #814 - Fix a bug causing the `cheap_struct` and `cheap_stress` bonus types to add to structure/stress repair cost, instead of overriding it.
+- Use actor image instead of token image for attack/damage targets in chat. This prevents broken images in chat when targeting an animated token.
+
 # 2.4.3 (2024-11-30)
 
 ## Bug Fixes

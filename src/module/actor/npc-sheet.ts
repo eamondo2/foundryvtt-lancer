@@ -12,7 +12,7 @@ export class LancerNPCSheet extends LancerActorSheet<EntryType.NPC> {
    * Extend and override the default options used by the NPC Sheet
    */
   static get defaultOptions(): ActorSheet.Options {
-    return mergeObject(super.defaultOptions, {
+    return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["lancer", "sheet", "actor", "npc"],
       template: `systems/${game.system.id}/templates/actor/npc.hbs`,
       width: 800,
@@ -99,8 +99,11 @@ export class LancerNPCSheet extends LancerActorSheet<EntryType.NPC> {
   canRootDrop(item: ResolvedDropData): boolean {
     // Reject any non npc item
     return (
-      item.type == "Item" &&
-      (item.document.is_npc_class() || item.document.is_npc_feature() || item.document.is_npc_template())
+      item.type === "Item" &&
+      (item.document.is_npc_class() ||
+        item.document.is_npc_feature() ||
+        item.document.is_npc_template() ||
+        item.document.is_status())
     );
   }
 

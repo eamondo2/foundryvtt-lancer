@@ -1,7 +1,7 @@
+import type { DeepPartial } from "@league-of-foundry-developers/foundry-vtt-types/src/types/utils.mjs";
 import { EntryType, makeWeaponSizeChecklist, makeWeaponTypeChecklist } from "../../enums";
 import { SourceData } from "../../source-template";
-import { PackedMechSystemData, PackedWeaponModData } from "../../util/unpacking/packed-types";
-import { unpackDeployable } from "../actors/deployable";
+import { PackedWeaponModData } from "../../util/unpacking/packed-types";
 import { unpackAction } from "../bits/action";
 import { unpackBonus } from "../bits/bonus";
 import { unpackCounter } from "../bits/counter";
@@ -11,22 +11,25 @@ import { unpackSynergy } from "../bits/synergy";
 import { TagField, unpackTag } from "../bits/tag";
 import { LancerDataModel, UnpackContext, WeaponSizeChecklistField, WeaponTypeChecklistField } from "../shared";
 import {
-  template_universal_item,
+  addDeployableTags,
+  migrateManufacturer,
   template_bascdt,
   template_destructible,
   template_licensed,
+  template_universal_item,
   template_uses,
-  migrateManufacturer,
 } from "./shared";
 
-const fields: any = foundry.data.fields;
+const fields = foundry.data.fields;
 
-// @ts-ignore
-export class WeaponModModel extends LancerDataModel<"WeaponModModel"> {
+export class WeaponModModel extends LancerDataModel<DataSchema, Item> {
   static defineSchema() {
     return {
+      // @ts-expect-error
       added_tags: new fields.ArrayField(new TagField()),
+      // @ts-expect-error
       added_damage: new fields.ArrayField(new DamageField()),
+      // @ts-expect-error
       added_range: new fields.ArrayField(new RangeField()),
       effect: new fields.HTMLField(),
       description: new fields.HTMLField(),
@@ -45,8 +48,6 @@ export class WeaponModModel extends LancerDataModel<"WeaponModModel"> {
     if (data.source) {
       data.manufacturer = migrateManufacturer(data.source);
     }
-
-    // @ts-expect-error v11
     return super.migrateData(data);
   }
 }
@@ -60,6 +61,7 @@ export function unpackWeaponMod(
   type: EntryType.WEAPON_MOD;
   system: DeepPartial<SourceData.WeaponMod>;
 } {
+  const { deployables, tags } = addDeployableTags(data.deployables, data.tags, context);
   return {
     name: data.name,
     type: EntryType.WEAPON_MOD,
@@ -69,7 +71,7 @@ export function unpackWeaponMod(
       bonuses: data.bonuses?.map(unpackBonus),
       cascading: undefined,
       counters: data.counters?.map(unpackCounter),
-      deployables: data.deployables?.map(d => unpackDeployable(d, context)),
+      deployables,
       description: data.description,
       destroyed: undefined,
       effect: data.effect,
@@ -79,7 +81,7 @@ export function unpackWeaponMod(
       manufacturer: data.source,
       sp: data.sp,
       synergies: data.synergies?.map(unpackSynergy),
-      tags: data.tags?.map(unpackTag),
+      tags,
       uses: { value: 0, max: 0 },
       added_damage: data.added_damage?.map(unpackDamage),
       added_range: data.added_range?.map(unpackRange),

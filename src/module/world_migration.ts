@@ -1,13 +1,17 @@
 // @ts-nocheck
 // We do not care about this file being super rigorous
 import { LancerActor } from "./actor/lancer-actor";
-import { core_update, LCPManager, updateCore } from "./apps/lcp-manager";
-import { clearCompendiumData } from "./comp-builder";
+import { LCPManager } from "./apps/lcp-manager/lcp-manager";
+import { clearCompendiumData, importCP } from "./comp-builder";
 import { LANCER } from "./config";
 import { EntryType } from "./enums";
 import { LancerItem } from "./item/lancer-item";
 import { LancerTokenDocument } from "./token";
 import { get_pack, get_pack_id } from "./util/doc";
+import { getBaseContentPack } from "./util/lcps";
+import { version as coreUpdate } from "@massif/lancer-data/package.json";
+
+const { log_prefix: lp } = LANCER;
 
 /**
  * DataModels should internally handle any migrations across versions.
@@ -44,25 +48,38 @@ function migrationProgress(count: number) {
 export async function migrateWorld() {
   const curr_version = game.settings.get(game.system.id, LANCER.setting_migration_version);
 
-  const journals = await game.packs.get("lancer.lancer_info")?.getDocuments({ name: "LANCER System Information" });
-  if (journals.length) {
-    await journals[0].sheet?.render(true);
-  }
-
   // Migrate from the pre-2.0 compendium structure the combined compendiums
   if (foundry.utils.isNewerVersion("2.0.0", curr_version)) {
+    console.log(`${lp} World is coming from 1.X. Show the migration journal and clear compendiums.`);
+    // Show the migration journal if the world is coming from 1.X.
+    const journals = await game.packs.get("lancer.lancer_info")?.getDocuments({ name: "LANCER System Information" });
+    if (journals.length) {
+      const systemInfo = journals[0] as JournalEntry;
+      const migrationPage = systemInfo.pages.find(p => p.name.startsWith("Migrating"));
+      await systemInfo.sheet?.render(true);
+      const showPage = async () => {
+        while (!systemInfo.sheet?.rendered) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+        // await new Promise(r => setTimeout(r, 3000));
+        systemInfo.sheet?.goToPage(migrationPage._id);
+      };
+      showPage();
+    }
     await clearCompendiumData({ v1: true });
     await migrateCompendiumStructure();
   }
   // Update World Compendium Packs, since updates comes with a more up to date version of lancerdata usually
-  await updateCore(core_update);
+  const coreData = await getBaseContentPack();
+  await importCP(coreData.cp);
+  await game.settings.set(game.system.id, LANCER.setting_core_data, coreData.availableVersion);
 
   // For some reason the commitDataModelMigrations call clears the progress bar, so we delay showing it.
   setTimeout(() => SceneNavigation.displayProgressBar({ label: migrationProgressBarLabel(), pct: 0 }), 1000);
   // Clean out old data fields so they don't cause issues
   await commitDataModelMigrations();
 
-  if (game.settings.get(game.system.id, LANCER.setting_core_data) !== core_update) {
+  if (game.settings.get(game.system.id, LANCER.setting_core_data) !== coreUpdate) {
     // Compendium migration failed.
     new Dialog({
       title: `Compendium Migration Failed`,

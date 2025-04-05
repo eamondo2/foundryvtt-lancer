@@ -1,6 +1,6 @@
 import { EntryType } from "../enums";
+import { fromLidMany } from "../helpers/from-lid";
 import { LancerItemSheetData } from "../interfaces";
-import { lookupDeployables, lookupLID } from "../util/lid";
 import { LancerItemSheet } from "./item-sheet";
 
 /**
@@ -12,8 +12,8 @@ export class LancerFrameSheet extends LancerItemSheet<EntryType.FRAME> {
    * @override
    * Extend and override the default options used by the generic Lancer item sheet
    */
-  static get defaultOptions(): ItemSheet.Options {
-    return mergeObject(super.defaultOptions, {
+  static get defaultOptions(): DocumentSheetOptions<Item> {
+    return foundry.utils.mergeObject(super.defaultOptions, {
       width: 700,
       height: 750,
     });
@@ -56,7 +56,7 @@ export class LancerFrameSheet extends LancerItemSheet<EntryType.FRAME> {
 
   async getData(): Promise<LancerItemSheetData<EntryType.FRAME>> {
     let data = await super.getData();
-    (data as any).coreDeployables = await lookupDeployables(data.system.core_system.deployables);
+    (data as any).coreDeployables = await fromLidMany(data.system.core_system.deployables);
     return data;
   }
 }

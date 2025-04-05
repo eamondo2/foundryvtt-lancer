@@ -14,9 +14,9 @@ import {
 import { handleContextMenus } from "../helpers/item";
 import { applyCollapseListeners, CollapseHandler, initializeCollapses } from "../helpers/collapse";
 import { ActionEditDialog } from "../apps/action-editor";
-import { find_license_for, get_pack_id } from "../util/doc";
+import { findLicenseFor, get_pack_id } from "../util/doc";
 import { lookupOwnedDeployables } from "../util/lid";
-import { EffectType, EntryType, StatusConditionType } from "../enums";
+import { EntryType, StatusConditionType } from "../enums";
 import { LancerDEPLOYABLE } from "../actor/lancer-actor";
 import { BonusEditDialog } from "../apps/bonus-editor";
 import { OrgType } from "../enums";
@@ -28,11 +28,11 @@ const lp = LANCER.log_prefix;
  * Extend the basic ItemSheet with some very simple modifications
  * @extends {ItemSheet}
  */
-export class LancerItemSheet<T extends LancerItemType> extends ItemSheet<ItemSheet.Options, LancerItemSheetData<T>> {
-  constructor(document: LancerItem, options: ItemSheet.Options) {
+export class LancerItemSheet<T extends LancerItemType> extends ItemSheet<DocumentSheetOptions<Item>> {
+  constructor(document: LancerItem, options: Partial<DocumentSheetOptions<Item>>) {
     super(document, options);
     if (this.item.is_mech_weapon()) {
-      // @ts-ignore IDK if this even does anything
+      // @ts-expect-error IDK if this even does anything
       // TODO Figure out if this even does anything
       this.options.initial = `profile${this.item.system.selected_profile_index}`;
     }
@@ -45,8 +45,8 @@ export class LancerItemSheet<T extends LancerItemType> extends ItemSheet<ItemShe
    * @override
    * Extend and override the default options used by the Item Sheet
    */
-  static get defaultOptions(): ItemSheet.Options {
-    return mergeObject(super.defaultOptions, {
+  static get defaultOptions(): DocumentSheetOptions<Item> {
+    return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["lancer", "sheet", "item"],
       width: 700,
       height: 700,
@@ -178,9 +178,9 @@ export class LancerItemSheet<T extends LancerItemType> extends ItemSheet<ItemShe
     // Additionally we would like to find a matching license. Re-use ctx, try both a world and global reg, actor as well if it exists
     data.license = null;
     if (this.actor?.is_pilot() || this.actor?.is_mech()) {
-      data.license = await find_license_for(this.item, this.actor!);
+      data.license = await findLicenseFor(this.item, this.actor!);
     } else {
-      data.license = await find_license_for(this.item);
+      data.license = await findLicenseFor(this.item);
     }
 
     if (this.item.is_organization()) {
@@ -191,6 +191,7 @@ export class LancerItemSheet<T extends LancerItemType> extends ItemSheet<ItemShe
     if (this.item.is_status()) {
       data.status_types = StatusConditionType;
       if (!data.system.lid) {
+        // @ts-expect-error getData needs an overhaul for the new types
         data.system.lid = `status-${data.document.id}`;
       }
     }

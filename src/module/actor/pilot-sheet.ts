@@ -26,7 +26,7 @@ export class LancerPilotSheet extends LancerActorSheet<EntryType.PILOT> {
    * @returns {Object}
    */
   static get defaultOptions(): ActorSheet.Options {
-    return mergeObject(super.defaultOptions, {
+    return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["lancer", "sheet", "actor", "pilot"],
       template: `systems/${game.system.id}/templates/actor/pilot.hbs`,
       width: 900,
@@ -115,7 +115,7 @@ export class LancerPilotSheet extends LancerActorSheet<EntryType.PILOT> {
       }
 
       // JSON Import
-      html.find("#pilot-json-import").on("change", ev => this._onPilotJsonUpload(ev));
+      html.find<HTMLInputElement>("input#pilot-json-import").on("change", ev => this._onPilotJsonUpload(ev));
 
       // editing rawID clears vaultID
       // (other way happens automatically because we prioritise vaultID in commit)
@@ -146,21 +146,19 @@ export class LancerPilotSheet extends LancerActorSheet<EntryType.PILOT> {
     }
   }
 
-  _onPilotJsonUpload(ev: JQuery.ChangeEvent<HTMLElement, undefined, HTMLElement, HTMLElement>) {
-    let files = (ev.target as HTMLInputElement).files;
-    let jsonFile: File | null = null;
-    if (files) jsonFile = files[0];
+  _onPilotJsonUpload(ev: JQuery.ChangeEvent<HTMLInputElement, undefined, HTMLInputElement, HTMLInputElement>) {
+    const jsonFile = ev.target.files?.[0];
     if (!jsonFile) return;
 
     console.log(`${lp} Selected file changed`, jsonFile);
     const fr = new FileReader();
-    fr.readAsBinaryString(jsonFile);
-    fr.addEventListener("load", (ev: ProgressEvent) => {
-      this._onPilotJsonParsed((ev.target as FileReader).result as string, this.actor);
+    fr.addEventListener("load", ev => {
+      this._onPilotJsonParsed(ev.target?.result as string);
     });
+    fr.readAsText(jsonFile);
   }
 
-  async _onPilotJsonParsed(fileData: string | null, actor: LancerActor) {
+  async _onPilotJsonParsed(fileData: string | null) {
     if (!fileData) return;
     const pilotData = JSON.parse(fileData) as PackedPilotData;
     console.log(`${lp} Pilot Data of selected JSON:`, pilotData);
@@ -190,27 +188,21 @@ export class LancerPilotSheet extends LancerActorSheet<EntryType.PILOT> {
     });
   }
 
-  async getData() {
-    const data = await super.getData(); // Not fully populated yet!
-    const pilot = this.actor as LancerPILOT;
+  async getData(): Promise<object> {
+    const data: any = await super.getData(); // Not fully populated yet!
 
-    data.pilotCache = pilotCache();
-
-    // use the select if and only if we have the pilot in our cache
-    let pilotInSelect = data.pilotCache.find(p => p.cloudID == pilot.system.cloud_id);
-
-    if (pilotInSelect) {
-      // if this is a vault id we know of
-      data.vaultID = pilot.system.cloud_id;
-      data.rawID = "";
-    } else if (pilot.system.cloud_id && pilot.system.cloud_id.match(shareCodeMatcher)) {
-      // If this was a share code, show it in the input box so it can be edited
-      data.vaultID = "";
-      data.rawID = pilot.system.cloud_id;
-    } else {
-      data.rawID = "";
-      data.vaultID = "";
-    }
+    data.compConPilotList = pilotCache()
+      .sort((p1, p2) => {
+        if (p1.callsign < p2.callsign) return -1;
+        if (p1.callsign > p2.callsign) return 1;
+        if (p1.name < p2.name) return -1;
+        if (p1.name > p2.name) return 1;
+        return 0;
+      })
+      .reduce((acc, pilot) => {
+        acc[`${pilot.callsign} // ${pilot.name}`] = pilot.cloudID;
+        return acc;
+      }, {} as Record<string, string>);
 
     return data;
   }
@@ -218,13 +210,13 @@ export class LancerPilotSheet extends LancerActorSheet<EntryType.PILOT> {
   // Pilots can handle most stuff
   canRootDrop(item: ResolvedDropData): boolean {
     // Accept mechs, so as to change their pilot
-    if (item.type == "Actor" && item.document.is_mech()) {
+    if (item.type === "Actor" && item.document.is_mech()) {
       return true;
     }
 
     // Accept pilot items
     if (
-      item.type == "Item" &&
+      item.type === "Item" &&
       (item.document.is_core_bonus() ||
         item.document.is_pilot_weapon() ||
         item.document.is_pilot_armor() ||
@@ -234,7 +226,8 @@ export class LancerPilotSheet extends LancerActorSheet<EntryType.PILOT> {
         item.document.is_talent() ||
         item.document.is_organization() ||
         item.document.is_reserve() ||
-        item.document.is_bond())
+        item.document.is_bond() ||
+        item.document.is_status())
     ) {
       return true;
     }
@@ -373,7 +366,7 @@ export function allMechPreview(_options: HelperOptions): string {
 
   /// I still feel like this is pretty inefficient... but it's probably the best we can do for now
   let owned_mechs = (game?.actors?.filter(
-    mech =>
+    (mech: LancerActor) =>
       mech.is_mech() &&
       mech.system.pilot?.status == "resolved" &&
       mech.system.pilot.value.id === _options.data.root.actor.id

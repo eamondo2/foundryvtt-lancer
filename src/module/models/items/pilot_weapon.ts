@@ -1,24 +1,24 @@
+import type { DeepPartial } from "@league-of-foundry-developers/foundry-vtt-types/src/types/utils.mjs";
 import { EntryType } from "../../enums";
 import { SourceData } from "../../source-template";
 import { PackedPilotWeaponData } from "../../util/unpacking/packed-types";
-import { unpackDeployable } from "../actors/deployable";
 import { unpackAction } from "../bits/action";
 import { unpackBonus } from "../bits/bonus";
 import { DamageField, unpackDamage } from "../bits/damage";
 import { RangeField, unpackRange } from "../bits/range";
 import { unpackSynergy } from "../bits/synergy";
-import { unpackTag } from "../bits/tag";
 import { LancerDataModel, UnpackContext } from "../shared";
-import { template_universal_item, template_bascdt, template_uses } from "./shared";
+import { addDeployableTags, template_bascdt, template_universal_item, template_uses } from "./shared";
 
-const fields: any = foundry.data.fields;
+const fields = foundry.data.fields;
 
-// @ts-ignore
-export class PilotWeaponModel extends LancerDataModel {
+export class PilotWeaponModel extends LancerDataModel<DataSchema, Item> {
   static defineSchema() {
     return {
       description: new fields.StringField({ nullable: true }),
+      // @ts-expect-error
       range: new fields.ArrayField(new RangeField()),
+      // @ts-expect-error
       damage: new fields.ArrayField(new DamageField()),
       effect: new fields.StringField(),
       loaded: new fields.BooleanField(),
@@ -38,6 +38,7 @@ export function unpackPilotWeapon(
   type: EntryType.PILOT_WEAPON;
   system: DeepPartial<SourceData.PilotWeapon>;
 } {
+  const { deployables, tags } = addDeployableTags(data.deployables, data.tags, context);
   return {
     name: data.name,
     type: EntryType.PILOT_WEAPON,
@@ -46,7 +47,7 @@ export function unpackPilotWeapon(
       bonuses: data.bonuses?.map(unpackBonus) ?? [],
       synergies: data.synergies?.map(unpackSynergy),
       counters: undefined,
-      deployables: data.deployables?.map(d => unpackDeployable(d, context)) ?? [],
+      deployables: deployables ?? [],
 
       description: data.description,
       range: data.range.map(unpackRange),
@@ -55,7 +56,7 @@ export function unpackPilotWeapon(
       loaded: undefined,
 
       lid: data.id,
-      tags: (data.tags ?? []).map(unpackTag),
+      tags: tags ?? [],
     },
   };
 }

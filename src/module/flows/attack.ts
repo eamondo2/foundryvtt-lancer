@@ -1,17 +1,16 @@
 // Import TypeScript modules
-import { LANCER } from "../config";
-import { getAutomationOptions } from "../settings";
-import { LancerItem } from "../item/lancer-item";
-import { LancerActor, LancerNPC } from "../actor/lancer-actor";
-import { checkForHit } from "../helpers/automation/targeting";
+import { LancerActor } from "../actor/lancer-actor";
 import { AccDiffHudData, AccDiffHudDataSerialized, RollModifier } from "../apps/acc_diff";
-import { renderTemplateStep } from "./_render";
-import { SystemTemplates } from "../system-template";
-import { UUIDRef } from "../source-template";
-import { LancerFlowState } from "./interfaces";
 import { openSlidingHud } from "../apps/slidinghud";
-import { Flow, FlowState, Step } from "./flow";
+import { LANCER } from "../config";
 import { AttackType, RangeType, WeaponType } from "../enums";
+import { checkForHit } from "../helpers/automation/targeting";
+import { LancerItem } from "../item/lancer-item";
+import { UUIDRef } from "../source-template";
+import { SystemTemplates } from "../system-template";
+import { renderTemplateStep } from "./_render";
+import { Flow, FlowState, Step } from "./flow";
+import { LancerFlowState } from "./interfaces";
 
 const lp = LANCER.log_prefix;
 
@@ -53,7 +52,7 @@ export type AttackFlag = {
   attackerItemUuid?: string; // Item UUID used for the attack, if applicable
   invade?: boolean;
   targets: {
-    id: string;
+    uuid: string;
     setConditions?: object; // keys are statusEffect ids, values are boolean to indicate whether to apply or remove
     total: string;
     hit: boolean;
@@ -92,6 +91,7 @@ export class BasicAttackFlow extends Flow<LancerFlowState.AttackRollData> {
       type: "attack",
       title: data?.title || "",
       roll_str: data?.roll_str || "",
+      grit: data?.grit || 0,
       flat_bonus: data?.flat_bonus || 0,
       attack_type: data?.attack_type || AttackType.Melee,
       action: data?.action || null,
@@ -137,6 +137,7 @@ export class WeaponAttackFlow extends Flow<LancerFlowState.WeaponRollData> {
       type: "weapon",
       title: data?.title || "",
       roll_str: data?.roll_str || "",
+      grit: data?.grit || 0,
       flat_bonus: data?.flat_bonus || 0,
       attack_type: data?.attack_type || AttackType.Melee,
       action: data?.action || null,
@@ -178,14 +179,22 @@ export async function initAttackData(
     state.data.attack_type = isTech ? AttackType.Tech : AttackType.Melee; // Virtually all basic attacks are melee, so it's a good default
     state.data.flat_bonus = 0;
     if (state.actor.is_pilot() || state.actor.is_mech() || state.actor.is_deployable()) {
-      state.data.flat_bonus = isTech ? state.actor.system.tech_attack : state.actor.system.grit;
+      if (isTech) state.data.grit = state.actor.system.tech_attack;
+      else state.data.grit = state.actor.system.grit;
     } else if (state.actor.is_npc()) {
-      state.data.flat_bonus = isTech ? state.actor.system.sys : state.actor.system.tier;
+      state.data.grit = isTech ? state.actor.system.sys : state.actor.system.tier;
     }
     // TODO: check bonuses for flat attack bonus
     state.data.acc_diff = options?.acc_diff
       ? AccDiffHudData.fromObject(options.acc_diff)
-      : AccDiffHudData.fromParams(state.actor, [], state.data.title, Array.from(game.user!.targets));
+      : AccDiffHudData.fromParams(
+          state.actor,
+          [],
+          state.data.title,
+          Array.from(game.user!.targets),
+          state.data.grit,
+          state.data.flat_bonus
+        );
     return true;
   } else {
     // This title works for everything
@@ -203,11 +212,10 @@ export async function initAttackData(
       state.data.attack_type = profile.type === WeaponType.Melee ? AttackType.Melee : AttackType.Ranged;
 
       const shouldDisableGrit = game.settings.get(game.system.id, LANCER.setting_grit_disable) as Boolean;
-      if (shouldDisableGrit) {
-        state.data.flat_bonus = 0;
-      } else {
-        state.data.flat_bonus = state.actor.system.grit;
+      if (state.data.attack_type === AttackType.Ranged) {
+        state.data.flat_bonus = state.actor.system.bonuses.flat.ranged_attack || 0;
       }
+      state.data.grit = shouldDisableGrit ? 0 : state.actor.system.grit;
       // Add a +1 flat bonus for Death's Heads. This data isn't in lancer-data, so has to be hard-coded.
       if (state.actor.system.loadout.frame?.value?.system.lid == "mf_deaths_head") {
         // Death's Head gets +1 to all ranged attacks, which means if there's a non-threat range, it gets the bonus
@@ -218,7 +226,14 @@ export async function initAttackData(
 
       state.data.acc_diff = options?.acc_diff
         ? AccDiffHudData.fromObject(options.acc_diff)
-        : AccDiffHudData.fromParams(state.item, profile.all_tags, state.data.title, Array.from(game.user!.targets));
+        : AccDiffHudData.fromParams(
+            state.item,
+            profile.all_tags,
+            state.data.title,
+            Array.from(game.user!.targets),
+            state.data.grit,
+            state.data.flat_bonus
+          );
       return true;
     } else if (state.item.is_mech_system()) {
       // Tech attack system
@@ -230,7 +245,7 @@ export async function initAttackData(
         ui.notifications?.warn("Cannot use a system on a non-piloted mech!");
         return false;
       }
-      state.data.flat_bonus = state.actor.system.tech_attack;
+      state.data.grit = state.actor.system.tech_attack;
       // TODO: check bonuses for flat attack bonus
       state.data.acc_diff = options?.acc_diff
         ? AccDiffHudData.fromObject(options.acc_diff)
@@ -238,7 +253,9 @@ export async function initAttackData(
             state.item,
             state.item.system.tags,
             state.data.title,
-            Array.from(game.user!.targets)
+            Array.from(game.user!.targets),
+            state.data.grit,
+            state.data.flat_bonus
           );
       return true;
     } else if (state.item.is_npc_feature()) {
@@ -250,7 +267,7 @@ export async function initAttackData(
 
       let asWeapon = state.item.system as SystemTemplates.NPC.WeaponData;
       state.data.attack_type = asWeapon.weapon_type === WeaponType.Melee ? AttackType.Melee : AttackType.Ranged;
-      state.data.flat_bonus = asWeapon.attack_bonus[tier_index] ?? 0;
+      state.data.grit = asWeapon.attack_bonus[tier_index] ?? 0;
       state.data.acc_diff = options?.acc_diff
         ? AccDiffHudData.fromObject(options.acc_diff)
         : AccDiffHudData.fromParams(
@@ -258,6 +275,8 @@ export async function initAttackData(
             asWeapon.tags,
             state.data.title,
             Array.from(game.user!.targets),
+            state.data.grit,
+            state.data.flat_bonus,
             asWeapon.accuracy[tier_index] ?? 0
           );
       return true;
@@ -271,14 +290,16 @@ export async function initAttackData(
         ? AttackType.Ranged
         : AttackType.Melee;
       state.item.system;
-      state.data.flat_bonus = state.actor.system.grit;
+      state.data.grit = state.actor.system.grit;
       state.data.acc_diff = options?.acc_diff
         ? AccDiffHudData.fromObject(options.acc_diff)
         : AccDiffHudData.fromParams(
             state.item,
             state.item.system.tags,
             state.data.title,
-            Array.from(game.user!.targets)
+            Array.from(game.user!.targets),
+            state.data.grit,
+            state.data.flat_bonus
           );
       return true;
     }
@@ -289,7 +310,8 @@ export async function initAttackData(
 
 export async function checkWeaponLoaded(state: FlowState<LancerFlowState.WeaponRollData>): Promise<boolean> {
   // If this automation option is not enabled, skip the check.
-  if (!getAutomationOptions().limited_loading && getAutomationOptions().attacks) return true;
+  const { limited_loading, attacks } = game.settings.get(game.system.id, LANCER.setting_automation);
+  if (!limited_loading && attacks) return true;
   if (!state.item || (!state.item.is_mech_weapon() && !state.item.is_pilot_weapon() && !state.item.is_npc_feature())) {
     return false;
   }
@@ -391,8 +413,9 @@ export async function showAttackHUD(
   if (!state.data) throw new TypeError(`Attack flow state missing!`);
   try {
     state.data.acc_diff = await openSlidingHud("attack", state.data.acc_diff!);
-    state.data.flat_bonus += state.data.acc_diff.base.flatBonusInjected;
-    state.data.flat_bonus += Number.parseInt(state.data.acc_diff.base.skillBonusInjected.split("_")[0]);
+    state.data.grit = state.data.acc_diff.base.grit;
+    state.data.flat_bonus += Number.parseInt(state.data.acc_diff.base.skillBonus.split("_")[0]);
+    state.data.flat_bonus = state.data.acc_diff.base.flatBonus;
   } catch (_e) {
     // User hit cancel, abort the flow.
     return false;
@@ -409,14 +432,18 @@ export async function rollAttacks(
   if (!state.data) throw new TypeError(`Attack flow state missing!`);
   if (!state.data.acc_diff) throw new TypeError(`Accuracy/difficulty data missing!`);
 
-  state.data.attack_rolls = attackRolls(state.data.flat_bonus, state.data.acc_diff);
+  state.data.attack_rolls = attackRolls(state.data.grit + state.data.flat_bonus, state.data.acc_diff);
 
-  if (getAutomationOptions().attacks && state.data.attack_rolls.targeted.length > 0) {
+  if (
+    game.settings.get(game.system.id, LANCER.setting_automation).attacks &&
+    state.data.attack_rolls.targeted.length > 0
+  ) {
     let data = await Promise.all(
       state.data.attack_rolls.targeted.map(async targetingData => {
         let target = targetingData.target;
         let actor = target.actor as LancerActor;
-        let attack_roll = await new Roll(targetingData.roll).evaluate({ async: true });
+        // This is really async despit the warning
+        let attack_roll = await new Roll(targetingData.roll).evaluate();
         // @ts-expect-error DSN options aren't typed
         attack_roll.dice.forEach(d => (d.options.rollOrder = 1));
         const attack_tt = await attack_roll.getTooltip();
@@ -442,7 +469,8 @@ export async function rollAttacks(
     state.data.hit_results = data.map(d => d.hit);
     return true;
   } else {
-    let attack_roll = await new Roll(state.data.attack_rolls.roll).evaluate({ async: true });
+    // This is really async despit the warning
+    let attack_roll = await new Roll(state.data.attack_rolls.roll).evaluate();
     const attack_tt = await attack_roll.getTooltip();
     state.data.attack_results = [{ roll: attack_roll, tt: attack_tt }];
     state.data.hit_results = [];
@@ -473,7 +501,8 @@ export async function printAttackCard(
       attackerItemUuid: state.item?.uuid,
       targets: state.data.hit_results.map(hr => {
         return {
-          id: hr.target.document.uuid,
+          id: hr.target.document.id,
+          uuid: hr.target.document.uuid,
           setConditions: !!hr.usedLockOn ? { lockon: !hr.usedLockOn } : undefined,
           total: hr.total,
           hit: hr.hit,
@@ -503,24 +532,24 @@ export async function printAttackCard(
 
 // If user is GM, apply status changes to attacked tokens
 Hooks.on("createChatMessage", async (cm: ChatMessage, options: any, id: string) => {
-  // Consume lock-on if we are a GM
-  if (!game.user?.isGM) return;
-  const atkData: AttackFlag = cm.getFlag(game.system.id, "attackData") as any;
+  // Consume lock-on if we are the primary GM
+  if (!game.users?.activeGM?.isSelf) return;
+  const atkData = cm.getFlag(game.system.id, "attackData");
   if (!atkData || !atkData.targets) return;
   atkData.targets.forEach(target => {
     // Find the target in this scene
-    const tokenActor = game.canvas.scene?.tokens.find(token => token.id === target.id)?.actor;
+    const tokenActor = game.canvas.scene?.tokens.find(token => token.uuid === target.uuid)?.actor;
     if (!tokenActor) return;
     const statusToApply = [];
     const statusToRemove = [];
     for (const [stat, val] of Object.entries(target.setConditions || {})) {
       if (val) {
         // Apply status
-        console.log(`(Not) Applying ${stat} to Token ${target.id}`);
+        console.log(`(Not) Applying ${stat} to Token ${target.uuid}`);
         // TODO
       } else {
         // Remove status
-        console.log(`Removing ${stat} from Token ${target.id}`);
+        console.log(`Removing ${stat} from Token ${target.uuid}`);
         statusToRemove.push(stat);
       }
     }

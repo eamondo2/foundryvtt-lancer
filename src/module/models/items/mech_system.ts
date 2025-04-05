@@ -1,32 +1,33 @@
+import type { DeepPartial } from "@league-of-foundry-developers/foundry-vtt-types/src/types/utils.mjs";
 import { EntryType } from "../../enums";
 import { SourceData } from "../../source-template";
 import { PackedMechSystemData } from "../../util/unpacking/packed-types";
-import { unpackDeployable } from "../actors/deployable";
 import { unpackAction } from "../bits/action";
 import { AmmoField, unpackAmmo } from "../bits/ammo";
 import { unpackBonus } from "../bits/bonus";
 import { unpackCounter } from "../bits/counter";
 import { unpackSynergy } from "../bits/synergy";
-import { unpackTag } from "../bits/tag";
 import { LancerDataModel, UnpackContext } from "../shared";
 import {
-  template_universal_item,
+  addDeployableTags,
+  migrateManufacturer,
   template_bascdt,
   template_destructible,
   template_licensed,
+  template_universal_item,
   template_uses,
-  migrateManufacturer,
 } from "./shared";
 
-const fields: any = foundry.data.fields;
+const fields = foundry.data.fields;
 
-export class MechSystemModel extends LancerDataModel<"MechSystemModel"> {
+export class MechSystemModel extends LancerDataModel<DataSchema, Item> {
   static defineSchema() {
     return {
       effect: new fields.HTMLField(),
       sp: new fields.NumberField({ nullable: false, initial: 0 }),
       description: new fields.HTMLField(),
       type: new fields.StringField(),
+      // @ts-expect-error
       ammo: new fields.ArrayField(new AmmoField()),
       ...template_universal_item(),
       ...template_bascdt(),
@@ -41,7 +42,6 @@ export class MechSystemModel extends LancerDataModel<"MechSystemModel"> {
       data.manufacturer = migrateManufacturer(data.source);
     }
 
-    // @ts-expect-error v11
     return super.migrateData(data);
   }
 }
@@ -55,6 +55,7 @@ export function unpackMechSystem(
   type: EntryType.MECH_SYSTEM;
   system: DeepPartial<SourceData.MechSystem>;
 } {
+  const { deployables, tags } = addDeployableTags(data.deployables, data.tags, context);
   return {
     name: data.name,
     type: EntryType.MECH_SYSTEM,
@@ -64,7 +65,7 @@ export function unpackMechSystem(
       bonuses: data.bonuses?.map(unpackBonus),
       cascading: undefined,
       counters: data.counters?.map(unpackCounter),
-      deployables: data.deployables?.map(d => unpackDeployable(d, context)),
+      deployables,
       description: data.description,
       destroyed: undefined,
       effect: data.effect,
@@ -74,7 +75,7 @@ export function unpackMechSystem(
       manufacturer: data.source,
       sp: data.sp,
       synergies: data.synergies?.map(unpackSynergy),
-      tags: data.tags?.map(unpackTag),
+      tags,
       type: data.type,
       ammo: data.ammo?.map(unpackAmmo),
       uses: { value: 0, max: 0 },

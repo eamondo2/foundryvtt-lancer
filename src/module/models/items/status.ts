@@ -1,13 +1,14 @@
+import type { DeepPartial } from "@league-of-foundry-developers/foundry-vtt-types/src/types/utils.mjs";
 import { EntryType } from "../../enums";
-import { restrict_choices, restrict_enum } from "../../helpers/commons";
+import { restrict_choices } from "../../helpers/commons";
 import { SourceData } from "../../source-template";
 import { PackedStatusData } from "../../util/unpacking/packed-types";
 import { LancerDataModel, UnpackContext } from "../shared";
 import { template_universal_item } from "./shared";
 
-const fields: any = foundry.data.fields;
+const fields = foundry.data.fields;
 
-export class StatusModel extends LancerDataModel<"StatusModel"> {
+export class StatusModel extends LancerDataModel<DataSchema, Item> {
   static defineSchema() {
     return {
       effects: new fields.HTMLField(),
@@ -18,9 +19,18 @@ export class StatusModel extends LancerDataModel<"StatusModel"> {
 
   static migrateData(data: any) {
     if (data.type) data.type = data.type.toLowerCase(); // Fix "Condition" / "Status"
-
-    // @ts-expect-error v11
     return super.migrateData(data);
+  }
+
+  async _preCreate(...[data, options, user]: Parameters<LancerDataModel<DataSchema, Item>["_preCreate"]>) {
+    const allowed = await super._preCreate(data as any, options, user);
+    if (allowed === false) return false;
+    // Apply the corresponding status instead of creating the item if it's being created as embedded
+    if (this.parent.parent) {
+      // @ts-expect-error
+      this.parent.parent.toggleStatusEffect(this.lid, { active: true });
+      return false;
+    }
   }
 }
 

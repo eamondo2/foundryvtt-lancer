@@ -45,6 +45,7 @@ export class TechAttackFlow extends Flow<LancerFlowState.TechAttackRollData> {
       type: "tech",
       title: data?.title || "",
       roll_str: data?.roll_str || "",
+      grit: data?.grit || 0,
       flat_bonus: data?.flat_bonus || 0,
       attack_type: data?.attack_type || AttackType.Tech,
       action: data?.action || null,
@@ -73,7 +74,7 @@ function commonMechTechAttackInit(
   if (options?.action_path) {
     state.data.action = resolveDotpath(state.item, options.action_path);
   }
-  state.data.flat_bonus = state.actor.system.tech_attack;
+  state.data.grit = state.actor.system.tech_attack;
   if (state.data.action) {
     // Use the action data
     state.data.title =
@@ -89,6 +90,8 @@ function commonMechTechAttackInit(
         state.item.getTags() ?? [],
         state.data.title,
         Array.from(game.user!.targets),
+        state.data.grit,
+        state.data.flat_bonus,
         // TODO: is there a bonus we can check for this type of effect?
         // Add 1 accuracy for all you goblins
         state.actor.is_mech() && state.actor.system.loadout.frame?.value?.system.lid == "mf_goblin" ? 1 : 0
@@ -108,15 +111,22 @@ export async function initTechAttackData(
     }
     state.data.title = options?.title ?? "TECH ATTACK";
     state.data.attack_type = AttackType.Tech;
-    state.data.flat_bonus = 0;
+    state.data.flat_bonus = state.actor.system.bonuses.flat.tech_attack || 0;
     if (state.actor.is_pilot() || state.actor.is_mech()) {
-      state.data.flat_bonus = state.actor.system.tech_attack;
+      state.data.grit = state.actor.system.tech_attack;
     } else if (state.actor.is_npc()) {
-      state.data.flat_bonus = state.actor.system.sys;
+      state.data.grit = state.actor.system.sys;
     }
     state.data.acc_diff = options?.acc_diff
       ? AccDiffHudData.fromObject(options.acc_diff)
-      : AccDiffHudData.fromParams(state.actor, [], state.data.title, Array.from(game.user!.targets));
+      : AccDiffHudData.fromParams(
+          state.actor,
+          [],
+          state.data.title,
+          Array.from(game.user!.targets),
+          state.data.grit,
+          state.data.flat_bonus
+        );
     return true;
   } else {
     // This title works for everything
@@ -131,10 +141,18 @@ export async function initTechAttackData(
       let tier_index: number = state.item.system.tier_override || state.actor.system.tier - 1;
       let asTech = state.item.system as SystemTemplates.NPC.TechData;
       let acc = asTech.accuracy ? asTech.accuracy[tier_index] ?? 0 : 0;
-      state.data.flat_bonus = asTech.attack_bonus ? asTech.attack_bonus[tier_index] ?? 0 : 0;
+      state.data.grit = asTech.attack_bonus ? asTech.attack_bonus[tier_index] ?? 0 : 0;
       state.data.acc_diff = options?.acc_diff
         ? AccDiffHudData.fromObject(options.acc_diff)
-        : AccDiffHudData.fromParams(state.item, asTech.tags, state.data.title, Array.from(game.user!.targets), acc);
+        : AccDiffHudData.fromParams(
+            state.item,
+            asTech.tags,
+            state.data.title,
+            Array.from(game.user!.targets),
+            state.data.grit,
+            state.data.flat_bonus,
+            acc
+          );
       return true;
     } else if (state.item.is_mech_system() || state.item.is_frame()) {
       // Tech attack system
@@ -186,7 +204,8 @@ export async function printTechAttackCard(
       invade: state.data.invade,
       targets: state.data.hit_results.map(hr => {
         return {
-          id: hr.target.actor?.uuid || "",
+          id: hr.target.document.id,
+          uuid: hr.target.document.uuid,
           setConditions: !!hr.usedLockOn ? { lockon: !hr.usedLockOn } : undefined,
           total: hr.total,
           hit: hr.hit,

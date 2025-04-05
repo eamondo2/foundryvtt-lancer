@@ -1,18 +1,16 @@
+import type { DeepPartial } from "@league-of-foundry-developers/foundry-vtt-types/src/types/utils.mjs";
 import { EntryType } from "../../enums";
 import { SourceData } from "../../source-template";
 import { PackedPilotArmorData } from "../../util/unpacking/packed-types";
-import { unpackDeployable } from "../actors/deployable";
 import { unpackAction } from "../bits/action";
 import { unpackBonus } from "../bits/bonus";
 import { unpackSynergy } from "../bits/synergy";
-import { unpackTag } from "../bits/tag";
 import { LancerDataModel, UnpackContext } from "../shared";
-import { template_universal_item, template_bascdt, template_uses } from "./shared";
+import { template_universal_item, template_bascdt, template_uses, addDeployableTags } from "./shared";
 
-const fields: any = foundry.data.fields;
+const fields = foundry.data.fields;
 
-// @ts-ignore
-export class PilotArmorModel extends LancerDataModel {
+export class PilotArmorModel extends LancerDataModel<DataSchema, Item> {
   static defineSchema() {
     return {
       description: new fields.StringField({ nullable: true }),
@@ -31,6 +29,7 @@ export function unpackPilotArmor(
   type: EntryType.PILOT_ARMOR;
   system: DeepPartial<SourceData.PilotArmor>;
 } {
+  const { deployables, tags } = addDeployableTags(data.deployables, data.tags, context);
   return {
     name: data.name,
     type: EntryType.PILOT_ARMOR,
@@ -39,10 +38,10 @@ export function unpackPilotArmor(
       bonuses: data.bonuses?.map(unpackBonus) ?? [],
       synergies: data.synergies?.map(unpackSynergy),
       counters: undefined,
-      deployables: data.deployables?.map(d => unpackDeployable(d, context)) ?? [],
+      deployables: deployables ?? [],
       description: data.description,
       lid: data.id,
-      tags: (data.tags ?? []).map(unpackTag),
+      tags: tags ?? [],
     },
   };
 }

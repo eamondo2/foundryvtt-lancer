@@ -32,8 +32,8 @@ import type {
   LancerWEAPON_MOD,
 } from "../item/lancer-item";
 import { SystemTemplates } from "../system-template";
-import { FetcherCache } from "./async";
-import { lookupDeployables, lookupLID, lookupOwnedDeployables } from "./lid";
+import { fromLid, fromLidMany } from "../helpers/from-lid";
+import { lookupOwnedDeployables } from "./lid";
 import { requestImport } from "./requests";
 
 const PACK_SCOPE = "world";
@@ -60,62 +60,49 @@ export async function resort_item(moverand: LancerItem, dest: LancerItem, sort_b
 // }
 
 // Helper for finding what license an item comes from. Checks by name, an inelegant solution but probably good enough
-export async function find_license_for(item: LancerItem, in_actor?: LancerActor): Promise<LancerLICENSE | null> {
+export async function findLicenseFor(item: LancerItem, inActor?: LancerActor): Promise<LancerLICENSE | null> {
   // If the item does not have a license name, then we just bail
-  let license_name = ((item as any).system as SystemTemplates.licensed).license;
-  if (!license_name) {
+  let licenseKey = ((item as any).system as SystemTemplates.licensed).license;
+  if (!licenseKey) {
     return null;
   }
 
   // If an actor was supplied, we first check their inventory.
-  if (in_actor) {
+  if (inActor) {
     // Only pilots should have licenses, so for mechs we go to active pilot
     let pilot: LancerPILOT | null = null;
-    if (in_actor.is_mech() && in_actor.system.pilot?.status == "resolved") {
-      pilot = in_actor.system.pilot.value;
+    if (inActor.is_pilot()) pilot = inActor;
+    if (inActor.is_mech() && inActor.system.pilot?.status == "resolved") {
+      pilot = inActor.system.pilot.value;
     }
 
     // Check pilot inventory, in case they have a weird custom license
     if (pilot) {
-      let found = pilot.items
-        .filter(i => i.is_license())
-        .find(lic => (lic as LancerLICENSE).system.lid == license_name);
-      if (found) {
-        return found as LancerLICENSE;
-      }
+      let found =
+        pilot.items.filter(i => i.is_license()).find(lic => (lic as LancerLICENSE).system.key === licenseKey) ||
+        // Fall back to matching the license name
+        pilot.items.filter(i => i.is_license()).find(lic => (lic as LancerLICENSE).name === licenseKey);
+      if (found) found as LancerLICENSE;
     }
   }
 
-  // Actor was a bust. Try global
-  return world_and_comp_license_cache.fetch(license_name);
+  // Actor was a bust. Try global.
+  const pack = game.packs.get(get_pack_id(EntryType.LICENSE));
+  if (!pack) {
+    console.error("License pack not found");
+    return null;
+  }
+  await pack.getIndex();
+  const entry =
+    pack.index.find((e: any) => e.system?.key == licenseKey) ||
+    // Fall back to matching the license name
+    pack.index.find((e: any) => e.name == licenseKey);
+  if (!entry) {
+    console.error(`License not found: ${licenseKey}`);
+    return null;
+  }
+  return pack.getDocument(entry._id) as Promise<LancerLICENSE>;
 }
-
-// The cache to implement the above. Doesn't need to last long - this just happens in bursts
-// Just keeps track of license refs by name
-const world_and_comp_license_cache = new FetcherCache<string, LancerLICENSE | null>(async license_name => {
-  // TODO
-  /*
-  let ctx = new OpCtx();
-  let world_reg = new FoundryReg("game"); // Actor src doesn't matter at all
-  let world_license = await world_reg.get_cat(EntryType.LICENSE).lookup_live(ctx, { key: license_name });
-  if (world_license.length) {
-    return world_license[0];
-  }
-
-  // Ok. Try core compendium. This is most likely to be where it is, but best to try world first
-  let compendium_reg = new FoundryReg("comp_core");
-  let compendium_license = await compendium_reg.get_cat(EntryType.LICENSE).lookup_live(ctx, { key: license_name });
-  if (compendium_license.length) {
-    return compendium_license[0];
-  }
-
-  // Oh well!
-  console.log(
-    `Did not find ${license_name} in world/core compendium. Note that external compendiums are not (yet) scanned as part of this procedure`
-  );
-  */
-  return null;
-});
 
 // Returns true if this is one of the packs thats controlled by get_pack
 export function is_core_pack_name(name: string): boolean {
@@ -215,9 +202,9 @@ export async function get_pack(
     const basename = id.split(".")[1];
     const metadata: CompendiumCollection.Metadata = {
       name: basename,
-      //@ts-ignore - entity property deprecated, v9 uses type instead.
       type: entity_type,
       label: `lancer.compendium.${basename}`,
+      // @ts-expect-error Banner data not in types
       banner: `./systems/lancer/assets/banners/${basename}.svg`,
       system: "lancer",
       // sort: PackSort[basename],
@@ -250,7 +237,7 @@ export async function insinuate(items: Array<LancerItem>, to: LancerActor): Prom
         integrated = item.system.integrated;
       }
       for (let i of integrated) {
-        let found = await lookupLID(i);
+        let found = await fromLid(i);
         if (found) {
           newItems.push(found.toObject());
         }
@@ -277,9 +264,6 @@ export async function insinuate(items: Array<LancerItem>, to: LancerActor): Prom
  * @param owner Who to associate the deployables with
  */
 export async function importDeployablesFor(item: LancerItem, owner: LancerActor) {
-  // Deployables owned by pilot, not mech
-  if (owner.is_mech() && owner.system.pilot?.status == "resolved") owner = owner.system.pilot.value;
-
   let existing = lookupOwnedDeployables(owner);
   let existingLIDs = Object.keys(existing);
   let deps: string[] = [];
@@ -298,7 +282,7 @@ export async function importDeployablesFor(item: LancerItem, owner: LancerActor)
   if (!requiredLIDs.length) return;
 
   // Now find them
-  let imports = await lookupDeployables(requiredLIDs);
+  let imports = await fromLidMany(requiredLIDs);
 
   // And try to bring them in
   for (let i of imports) {

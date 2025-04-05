@@ -1,5 +1,8 @@
 /* TODO: Maybe multiple stylesheets is a good idea? Check out ITCSS and segment them by their layer */
-/* TODO: Webcomponents. Tags, cards, compact stat */
+
+@use "styles/lancer-app-v2";
+@use "styles/settings/lancer-initiative-config";
+@use "styles/combat/lancer-combat-tracker";
 
 /* Item/document types, useful for shorthand */
 $item-types: core_bonus environment faction frame manufacturer npc_class npc_template npc_feature weapon_mod mech_system
@@ -10,6 +13,7 @@ $document-types: join($item-types, $actor-types);
 /* Settings Layer*/
 :root {
   --main-font-family: Helvetica, Arial, sans-serif;
+  --monospace-font-family: Consolas, "Courier New", Courier, monaco, monospace;
 
   /* Sheet theme vars */
   --primary-color: #991e2a;
@@ -33,14 +37,6 @@ $document-types: join($item-types, $actor-types);
   --ssc-color: #d1920a;
   --horus-color: #00a256;
   --ha-color: #6e4373;
-
-  /* Lancer initiative vars */
-  --lancer-initiative-icon-size: 1rem;
-  --lancer-initiative-player-color: #000000;
-  --lancer-initiative-friendly-color: #000000;
-  --lancer-initiative-neutral-color: #000000;
-  --lancer-initiative-enemy-color: #000000;
-  --lancer-initiative-done-color: #000000;
 
   /* Gear and type color vars */
   --system-color: #58b434;
@@ -77,6 +73,14 @@ $document-types: join($item-types, $actor-types);
   --darken-3: rgba(var(--darken-color), 0.3);
   --darken-4: rgba(var(--darken-color), 0.4);
   --darken-5: rgba(var(--darken-color), 0.5);
+
+  /* Darkens tone by a small increment. For some themes should probably lighten instead, somehow? */
+  --lighten-color: 255, 255, 255;
+  --lighten-1: rgba(var(--lighten-color), 0.1);
+  --lighten-2: rgba(var(--lighten-color), 0.2);
+  --lighten-3: rgba(var(--lighten-color), 0.3);
+  --lighten-4: rgba(var(--lighten-color), 0.4);
+  --lighten-5: rgba(var(--lighten-color), 0.5);
 
   /* box-shadow values for hover glow and buttons */
   --hover-bright: inset 0 0 0 10em rgba(255, 255, 255, 0.15);
@@ -143,7 +147,7 @@ code {
   border-radius: 5px;
 }
 
-.app {
+.app header.window-header {
   /* Set UI icons to white when located in headers and over the dark colour scheme */
   color: white;
 }
@@ -151,8 +155,9 @@ code {
 .window-app .window-content,
 #chat-controls div.roll-type-select select,
 #chat-form textarea,
-button {
-  background: #ededed; /* Set default backgrounds to a futuristic gundam light grey */
+button,
+.sheet.journal-entry .journal-entry-content {
+  background: #e1e1e1; /* Set default backgrounds to a futuristic gundam light grey */
   font-family: var(--main-font-family);
 }
 
@@ -346,14 +351,14 @@ $theme-types: "primary" "secondary" "dark-gray" "light-gray" "tooltip"    // Gen
 .chat-popout {
   & .message {
     background: rgba(237, 237, 237);
-    border-radius: 25px 5px;
+    border-radius: 20px 5px;
     padding: 0;
     // overflow: hidden;
   }
 
   & .message-header {
     overflow: hidden;
-    border-radius: 22px 1px 0 0;
+    border-radius: 17px 1px 0 0;
     background-color: var(--primary-color, fuchsia);
     padding: 5px 10px;
   }
@@ -746,6 +751,42 @@ $theme-types: "primary" "secondary" "dark-gray" "light-gray" "tooltip"    // Gen
   font-size: 13px;
   margin-top: 2px;
   width: 3ch;
+}
+
+.lancer-license {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+}
+
+.edit-license-wrapper {
+  border: 1px solid var(--secondary-color);
+  border-radius: 5px;
+  margin: 0.5em;
+  padding: 0 0.25em;
+  width: min-content;
+  max-width: min-content;
+  flex-wrap: unset;
+  align-self: center;
+  gap: 1em;
+
+  .rank-wrapper {
+    align-items: center;
+    justify-content: center;
+    flex-wrap: unset;
+
+    & span {
+      margin-right: 0.5em;
+      font-size: 1.2em;
+      flex-grow: unset;
+    }
+
+    & input {
+      max-width: 2em;
+    }
+  }
 }
 
 .labeled-input {
@@ -1500,13 +1541,13 @@ input[type="text"].lancer-input {
 }
 
 .monospace {
-  font-family: Consolas, "Courier New", Courier, monaco, monospace;
+  font-family: var(--monospace-font-family);
 }
 
 .desc-text {
   text-align: left;
   padding: 0.5em;
-  font-family: Consolas, "Courier New", Courier, monaco, monospace;
+  font-family: var(--monospace-font-family);
 
   border: 1px solid #999;
   border-radius: 5px;
@@ -1548,7 +1589,7 @@ input[type="text"].lancer-input {
 /* Start of HORUS glitchy styles used in lancer-data */
 code {
   padding: 4px 12px 4px 12px;
-  font-family: monospace, monospace;
+  font-family: var(--monospace-font-family);
 }
 
 code.horus {
@@ -2354,27 +2395,6 @@ a.activation-chip > i.mdi {
   margin-bottom: 0.25em;
 }
 
-.rank-wrapper {
-  align-items: center;
-  justify-content: center;
-  border-color: var(--secondary-highlight);
-  border-width: 0px 1px 1px;
-  border-style: solid;
-  position: relative;
-  top: -1px;
-  padding: 2px;
-}
-
-.rank-wrapper span {
-  margin-right: 0.5em;
-  font-size: 1.2em;
-  flex-grow: unset;
-}
-
-.rank-wrapper input {
-  max-width: 2em;
-}
-
 .uses-editor > span {
   padding: inherit;
   text-align: center;
@@ -2556,6 +2576,13 @@ a.activation-chip > i.mdi {
     cursor: default;
     text-shadow: none;
     box-shadow: none;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    text-shadow: none;
+    box-shadow: none;
+    filter: brightness(0.7);
   }
 
   // TODO: make all chat buttons tighter. Needs alignment
@@ -2969,174 +2996,4 @@ Here, this means we want to allow for drag stuff etc to show contextually if:
 .grid-enforcement > * {
   grid-column: 1/2;
   grid-row: 1/2;
-}
-
-/* Lancer Initiative stuff
-   This is plain css for now */
-.-emu #sidebar #combat #combat-tracker li.combatant,
-.-emu #combat-popout #combat #combat-tracker li.combatant,
-#combat-tracker li.combatant {
-  padding-right: 0.5em;
-  border: 3px;
-  border-radius: 5px;
-  border-style: solid;
-  border-top: 0px;
-  border-bottom: 0px;
-  margin: 4px;
-}
-
-#combat,
-#combat-popout {
-  #combat-tracker {
-    .combatant {
-      .token-initiative {
-        padding-left: 0.5em;
-        align-items: center;
-        display: flex;
-        position: relative;
-        flex: 0 0 auto;
-      }
-
-      .combatant-controls {
-        span.activations {
-          flex: 0 0 20px;
-          width: 20px;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          i {
-            color: var(--color-text-dark-5);
-            font-size: 20px;
-            position: relative;
-            left: 50%;
-          }
-          span {
-            flex: 0 0 20px;
-            text-align: center;
-            font-size: 14px;
-            position: relative;
-            left: -50%;
-            opacity: 0.8;
-          }
-        }
-      }
-
-      .token-initiative {
-        i,
-        a {
-          font-size: var(--lancer-initiative-icon-size);
-        }
-      }
-    }
-
-    .combatant.player {
-      border-color: var(--lancer-initiative-player-color) !important;
-
-      .token-initiative a {
-        color: var(--lancer-initiative-player-color);
-        &.done {
-          color: var(--lancer-initiative-done-color);
-        }
-      }
-    }
-    .combatant.friendly {
-      border-color: var(--lancer-initiative-friendly-color) !important;
-
-      .token-initiative a {
-        color: var(--lancer-initiative-friendly-color);
-        &.done {
-          color: var(--lancer-initiative-done-color);
-        }
-      }
-    }
-    .combatant.neutral {
-      border-color: var(--lancer-initiative-neutral-color) !important;
-
-      .token-initiative a {
-        color: var(--lancer-initiative-neutral-color);
-        &.done {
-          color: var(--lancer-initiative-done-color);
-        }
-      }
-    }
-    .combatant.enemy {
-      border-color: var(--lancer-initiative-enemy-color) !important;
-
-      .token-initiative a {
-        color: var(--lancer-initiative-enemy-color);
-        &.done {
-          color: var(--lancer-initiative-done-color);
-        }
-      }
-    }
-  }
-}
-
-#combat-carousel.lancer {
-  li.card {
-    div.lancer-activate {
-      a,
-      i {
-        font-size: var(--lancer-initiative-icon-size);
-      }
-
-      i.done {
-        color: var(--lancer-initiative-done-color);
-      }
-      position: absolute;
-      right: 0;
-      padding: 2px 0px;
-      border-radius: 25%;
-      z-index: 20;
-    }
-    text-align: left;
-    margin: 0px;
-  }
-
-  li.card.player {
-    div.lancer-activate a {
-      color: var(--lancer-initiative-player-color);
-    }
-  }
-  li.card.friendly {
-    div.lancer-activate a {
-      color: var(--lancer-initiative-friendly-color);
-    }
-  }
-  li.card.neutral {
-    div.lancer-activate a {
-      color: var(--lancer-initiative-neutral-color);
-    }
-  }
-  li.card.enemy {
-    div.lancer-activate a {
-      color: var(--lancer-initiative-enemy-color);
-    }
-  }
-}
-
-#combat,
-#combat-popout {
-  #combat-tracker li.combatant.turn-done {
-    // Furnace crap
-    color: inherit;
-    text-decoration: inherit;
-  }
-}
-
-#lancer-initiative-settings {
-  input[type="color"] {
-    flex: 0 0 3rem;
-    cursor: pointer;
-  }
-  #preview-combat {
-    padding: 0px;
-    margin: 1rem;
-  }
-  .token-image {
-    height: 48px;
-    width: 48px;
-    max-width: 48px;
-    border: 0px;
-  }
 }
