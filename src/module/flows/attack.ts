@@ -211,11 +211,12 @@ export async function initAttackData(
       let profile = state.item.system.active_profile;
       state.data.attack_type = profile.type === WeaponType.Melee ? AttackType.Melee : AttackType.Ranged;
 
-      const shouldDisableGrit = game.settings.get(game.system.id, LANCER.setting_grit_disable) as Boolean;
+      // const shouldDisableGrit = game.settings.get(game.system.id, LANCER.setting_grit_disable) as Boolean;
       if (state.data.attack_type === AttackType.Ranged) {
         state.data.flat_bonus = state.actor.system.bonuses.flat.ranged_attack || 0;
       }
-      state.data.grit = shouldDisableGrit ? 0 : state.actor.system.grit;
+      // state.data.grit = shouldDisableGrit ? 0 : state.actor.system.grit;
+      state.data.grit = 0;
       // Add a +1 flat bonus for Death's Heads. This data isn't in lancer-data, so has to be hard-coded.
       if (state.actor.system.loadout.frame?.value?.system.lid == "mf_deaths_head") {
         // Death's Head gets +1 to all ranged attacks, which means if there's a non-threat range, it gets the bonus
@@ -414,8 +415,9 @@ export async function showAttackHUD(
   try {
     state.data.acc_diff = await openSlidingHud("attack", state.data.acc_diff!);
     state.data.grit = state.data.acc_diff.base.grit;
-    state.data.flat_bonus += Number.parseInt(state.data.acc_diff.base.skillBonus.split("_")[0]);
     state.data.flat_bonus = state.data.acc_diff.base.flatBonus;
+    state.data.flat_bonus += Number.parseInt(state.data.acc_diff.base.skillBonus.split("_")[0]);
+    console.log(`FLATBONUS: ${state.data.flat_bonus}`);
   } catch (_e) {
     // User hit cancel, abort the flow.
     return false;

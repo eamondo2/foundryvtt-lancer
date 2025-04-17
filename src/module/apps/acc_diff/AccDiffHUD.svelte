@@ -61,6 +61,7 @@
     if (lancerActor?.is_mech()) {
       let pilotActor = lancerActor.system.pilot;
       if (pilotActor?.status === "resolved") {
+        // @ts-expect-error Infinite recursion?
         let skillList = pilotActor.value.items
           .filter(x => {
             return is_skill(x);
@@ -83,7 +84,7 @@
     // Ignore target hovering after the form has been submitted, to avoid flickering when
     // the UI slides down.
     if (submitted) return;
-    // @ts-expect-error Infinite recursion?
+
     const thtModule = game.modules.get("terrain-height-tools");
     if (!thtModule?.active || foundry.utils.isNewerVersion("0.3.3", thtModule.version)) {
       // @ts-expect-error not supposed to use a private method

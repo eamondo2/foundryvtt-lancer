@@ -174,15 +174,6 @@ export const registerSettings = function () {
     default: true,
   });
 
-  game.settings.register(game.system.id, LANCER.setting_grit_disable, {
-    name: "Disable Grit Bonus",
-    hint: "Disables grit bonus and Deaths' Head attack bonus",
-    scope: "world",
-    config: true,
-    type: Boolean,
-    default: false,
-  });
-
   CONFIG.LancerInitiative.sort = game.settings.get(game.system.id, "combat-tracker-sort");
   setAppearance(game.settings.get(game.system.id, "combat-tracker-appearance"));
 };
